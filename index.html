@@ -1,254 +1,771 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QuizMaster Pro - Interactive Quiz Platform</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuizMaster Pro - Online Test Platform</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+/* ===== RESET ===== */
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#f0f2f5;color:#333;overflow:hidden;height:100vh;}
+
+/* ===== UPLOAD SCREEN ===== */
+.screen{display:none;width:100%;height:100vh;}
+.screen.active{display:flex;}
+
+#uploadScreen{
+    align-items:center;justify-content:center;
+    background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+    flex-direction:column;
+}
+.upload-box{
+    background:#fff;border-radius:16px;padding:48px;max-width:550px;width:90%;
+    box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center;
+}
+.upload-box h1{font-size:28px;color:#333;margin-bottom:8px;}
+.upload-box .subtitle{color:#666;margin-bottom:32px;font-size:15px;}
+.upload-zone{
+    border:3px dashed #d0d5dd;border-radius:12px;padding:48px 24px;
+    cursor:pointer;transition:all 0.3s;margin-bottom:24px;background:#fafbfc;
+}
+.upload-zone:hover{border-color:#667eea;background:#f0f1ff;}
+.upload-zone .icon{font-size:48px;margin-bottom:12px;}
+.upload-zone h3{color:#333;margin-bottom:4px;}
+.upload-zone p{color:#888;font-size:13px;}
+.upload-progress{display:none;margin:16px 0;}
+.upload-progress.active{display:block;}
+.progress-track{height:6px;background:#e0e0e0;border-radius:3px;overflow:hidden;}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,#667eea,#764ba2);width:0%;transition:width 0.3s;}
+.progress-msg{font-size:13px;color:#666;margin-top:8px;}
+.divider{margin:24px 0;color:#aaa;font-size:13px;position:relative;}
+.divider::before,.divider::after{content:'';position:absolute;top:50%;width:42%;height:1px;background:#ddd;}
+.divider::before{left:0;}
+.divider::after{right:0;}
+.btn-sample{
+    background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;
+    border:none;padding:14px 32px;border-radius:8px;font-size:15px;font-weight:600;
+    cursor:pointer;transition:transform 0.2s,box-shadow 0.2s;
+}
+.btn-sample:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(102,126,234,0.4);}
+
+/* ===== EXAM SCREEN (Testbook/Oliveboard Style) ===== */
+#examScreen{flex-direction:column;height:100vh;}
+
+/* Header */
+.exam-header{
+    background:#1a237e;color:#fff;display:flex;align-items:center;
+    justify-content:space-between;padding:0 20px;height:56px;flex-shrink:0;
+}
+.exam-header .exam-title{font-size:16px;font-weight:600;display:flex;align-items:center;gap:10px;}
+.exam-header .exam-title .exam-icon{width:32px;height:32px;background:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;}
+.header-right{display:flex;align-items:center;gap:20px;}
+.timer-box{
+    background:rgba(255,255,255,0.15);padding:8px 16px;border-radius:6px;
+    font-family:'Courier New',monospace;font-size:16px;font-weight:700;
+    display:flex;align-items:center;gap:8px;
+}
+.timer-box.warning{background:rgba(255,193,7,0.3);color:#ffeb3b;}
+.timer-box.danger{background:rgba(244,67,54,0.3);color:#ff5252;animation:blink 1s infinite;}
+@keyframes blink{50%{opacity:0.6;}}
+.btn-submit-exam{
+    background:#4caf50;color:#fff;border:none;padding:8px 20px;
+    border-radius:6px;font-weight:600;cursor:pointer;font-size:14px;
+}
+.btn-submit-exam:hover{background:#43a047;}
+
+/* Subject Tabs */
+.subject-tabs{
+    background:#283593;display:flex;padding:0 20px;gap:0;flex-shrink:0;overflow-x:auto;
+}
+.subject-tab{
+    padding:10px 24px;color:rgba(255,255,255,0.7);cursor:pointer;font-size:13px;
+    font-weight:500;border-bottom:3px solid transparent;transition:all 0.2s;white-space:nowrap;
+}
+.subject-tab.active{color:#fff;border-bottom-color:#ffeb3b;background:rgba(255,255,255,0.08);}
+.subject-tab:hover{color:#fff;background:rgba(255,255,255,0.05);}
+
+/* Main Content Area */
+.exam-content{display:flex;flex:1;overflow:hidden;}
+
+/* Question Panel (Left) */
+.question-panel{
+    flex:1;display:flex;flex-direction:column;background:#fff;overflow-y:auto;
+}
+.question-area{flex:1;padding:24px 32px;overflow-y:auto;}
+.q-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+.q-number{
+    background:#e8eaf6;color:#1a237e;padding:6px 14px;border-radius:6px;
+    font-weight:700;font-size:14px;
+}
+.q-marks{font-size:13px;color:#666;}
+.q-marks span{font-weight:600;color:#1a237e;}
+.q-text{font-size:16px;line-height:1.8;color:#222;margin-bottom:28px;padding-right:20px;}
+
+/* Options */
+.options-list{display:flex;flex-direction:column;gap:12px;}
+.option-item{
+    display:flex;align-items:flex-start;gap:14px;padding:14px 18px;
+    border:2px solid #e0e0e0;border-radius:10px;cursor:pointer;transition:all 0.2s;
+    background:#fafbfc;
+}
+.option-item:hover{border-color:#667eea;background:#f5f6ff;}
+.option-item.selected{border-color:#1a237e;background:#e8eaf6;}
+.option-item.correct{border-color:#4caf50 !important;background:#e8f5e9 !important;}
+.option-item.wrong{border-color:#f44336 !important;background:#ffebee !important;}
+.option-item.disabled{pointer-events:none;opacity:0.85;}
+.option-item.disabled.correct,.option-item.disabled.wrong{opacity:1;}
+.option-radio{
+    width:22px;height:22px;border-radius:50%;border:2px solid #bbb;
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;
+}
+.option-item.selected .option-radio{border-color:#1a237e;background:#1a237e;}
+.option-item.selected .option-radio::after{content:'';width:8px;height:8px;background:#fff;border-radius:50%;}
+.option-item.correct .option-radio{border-color:#4caf50;background:#4caf50;}
+.option-item.correct .option-radio::after{content:'✓';color:#fff;font-size:12px;font-weight:700;}
+.option-item.wrong .option-radio{border-color:#f44336;background:#f44336;}
+.option-item.wrong .option-radio::after{content:'✗';color:#fff;font-size:12px;font-weight:700;}
+.option-label{font-weight:600;color:#555;margin-right:4px;min-width:16px;}
+.option-text{flex:1;font-size:15px;line-height:1.5;color:#333;}
+
+/* Feedback Banner */
+.feedback-box{
+    margin-top:20px;padding:14px 20px;border-radius:8px;display:none;
+    font-weight:600;font-size:14px;align-items:center;gap:10px;
+}
+.feedback-box.active{display:flex;}
+.feedback-box.correct{background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;}
+.feedback-box.wrong{background:#ffebee;color:#c62828;border:1px solid #ef9a9a;}
+
+/* Solution */
+.solution-box{
+    margin-top:16px;display:none;padding:20px;background:#fff8e1;
+    border:1px solid #ffe082;border-radius:8px;
+}
+.solution-box.active{display:block;}
+.solution-box h4{color:#f57f17;margin-bottom:8px;font-size:14px;}
+.solution-box p{color:#555;font-size:14px;line-height:1.7;}
+.btn-solution{
+    margin-top:12px;background:none;border:1px solid #ff9800;color:#ff9800;
+    padding:8px 16px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;
+}
+.btn-solution:hover{background:#fff3e0;}
+
+/* Bottom Navigation */
+.nav-bar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:12px 24px;background:#fff;border-top:1px solid #e0e0e0;flex-shrink:0;
+}
+.nav-left,.nav-right{display:flex;gap:10px;}
+.nav-btn{
+    padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600;
+    cursor:pointer;border:2px solid;transition:all 0.2s;
+}
+.btn-mark{border-color:#9c27b0;color:#9c27b0;background:#fff;}
+.btn-mark:hover{background:#f3e5f5;}
+.btn-clear{border-color:#ff9800;color:#ff9800;background:#fff;}
+.btn-clear:hover{background:#fff3e0;}
+.btn-prev{border-color:#607d8b;color:#607d8b;background:#fff;}
+.btn-prev:hover{background:#eceff1;}
+.btn-save-next{border-color:#1a237e;color:#fff;background:#1a237e;}
+.btn-save-next:hover{background:#283593;}
+
+/* Right Sidebar - Question Palette */
+.sidebar{
+    width:280px;background:#fff;border-left:1px solid #e0e0e0;
+    display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;
+}
+.sidebar-header{
+    padding:14px 16px;background:#f5f5f5;border-bottom:1px solid #e0e0e0;
+    font-weight:700;font-size:14px;color:#333;
+}
+.sidebar-legend{
+    display:flex;flex-wrap:wrap;gap:8px;padding:12px 16px;border-bottom:1px solid #e0e0e0;
+    font-size:11px;
+}
+.legend-item{display:flex;align-items:center;gap:4px;}
+.legend-dot{width:16px;height:16px;border-radius:4px;font-size:9px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;}
+.legend-dot.answered{background:#4caf50;}
+.legend-dot.not-answered{background:#f44336;}
+.legend-dot.marked{background:#9c27b0;}
+.legend-dot.not-visited{background:#bbb;}
+.legend-dot.current{background:#1a237e;}
+
+.palette-grid{
+    display:grid;grid-template-columns:repeat(5,1fr);gap:8px;
+    padding:16px;overflow-y:auto;flex:1;
+}
+.palette-btn{
+    width:36px;height:36px;border-radius:6px;border:none;font-size:13px;
+    font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;
+    transition:all 0.2s;background:#e0e0e0;color:#555;
+}
+.palette-btn.answered{background:#4caf50;color:#fff;}
+.palette-btn.wrong-answer{background:#f44336;color:#fff;}
+.palette-btn.not-answered{background:#f44336;color:#fff;}
+.palette-btn.marked{background:#9c27b0;color:#fff;}
+.palette-btn.current{background:#1a237e;color:#fff;box-shadow:0 2px 8px rgba(26,35,126,0.4);}
+.palette-btn.not-visited{background:#e0e0e0;color:#555;}
+.palette-btn:hover{transform:scale(1.1);}
+
+/* ===== RESULTS SCREEN ===== */
+#resultsScreen{flex-direction:column;overflow-y:auto;background:#f0f2f5;}
+.results-wrapper{max-width:900px;margin:0 auto;padding:32px 20px;width:100%;}
+.results-header{text-align:center;margin-bottom:32px;}
+.results-header h1{font-size:28px;color:#1a237e;margin-bottom:8px;}
+.results-header p{color:#666;}
+
+.score-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px;}
+.score-card{
+    background:#fff;border-radius:12px;padding:24px 16px;text-align:center;
+    box-shadow:0 2px 8px rgba(0,0,0,0.06);border-top:4px solid;
+}
+.score-card.correct{border-top-color:#4caf50;}
+.score-card.wrong{border-top-color:#f44336;}
+.score-card.skipped{border-top-color:#ff9800;}
+.score-card.time{border-top-color:#2196f3;}
+.score-card .num{font-size:32px;font-weight:800;margin-bottom:4px;}
+.score-card.correct .num{color:#4caf50;}
+.score-card.wrong .num{color:#f44336;}
+.score-card.skipped .num{color:#ff9800;}
+.score-card.time .num{color:#2196f3;}
+.score-card .label{font-size:13px;color:#777;}
+
+.score-banner{
+    background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;
+    border-radius:12px;padding:32px;text-align:center;margin-bottom:32px;
+}
+.score-banner .big-score{font-size:56px;font-weight:800;}
+.score-banner .score-subtitle{font-size:15px;opacity:0.9;margin-top:4px;}
+
+.results-table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:24px;}
+.results-table th{background:#1a237e;color:#fff;padding:12px 16px;font-size:13px;text-align:left;}
+.results-table td{padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:13px;}
+.results-table tr:last-child td{border-bottom:none;}
+.results-table tr:hover td{background:#f8f9ff;}
+.status-badge{padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600;}
+.status-badge.correct{background:#e8f5e9;color:#2e7d32;}
+.status-badge.wrong{background:#ffebee;color:#c62828;}
+.status-badge.skipped{background:#fff3e0;color:#e65100;}
+
+.results-actions{display:flex;justify-content:center;gap:16px;margin-top:24px;}
+.results-actions .btn-sample{padding:12px 28px;font-size:14px;}
+.btn-outline-r{background:#fff;color:#667eea;border:2px solid #667eea;padding:12px 28px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;}
+.btn-outline-r:hover{background:#f0f1ff;}
+</style>
 </head>
 <body>
-    <!-- Theme Toggle -->
-    <button class="theme-toggle" id="themeToggle" title="Toggle Dark/Light Mode">
-        <span class="theme-icon">&#127769;</span>
-    </button>
 
-    <!-- Keyboard Shortcuts Help -->
-    <button class="shortcuts-btn" id="shortcutsBtn" title="Keyboard Shortcuts">
-        <span>&#9000;</span>
-    </button>
+<!-- ========== UPLOAD SCREEN ========== -->
+<div class="screen active" id="uploadScreen">
+    <div class="upload-box">
+        <h1>QuizMaster Pro</h1>
+        <p class="subtitle">Upload your question PDF and start practicing instantly</p>
+        <div class="upload-zone" id="uploadZone">
+            <div class="icon">📄</div>
+            <h3>Drop your PDF here</h3>
+            <p>or click to browse files (MCQ format)</p>
+        </div>
+        <input type="file" id="pdfInput" accept=".pdf" hidden>
+        <div class="upload-progress" id="uploadProgress">
+            <div class="progress-track"><div class="progress-bar-fill" id="progressFill"></div></div>
+            <p class="progress-msg" id="progressMsg">Extracting questions...</p>
+        </div>
+        <div class="divider">OR</div>
+        <button class="btn-sample" id="btnSample">🎯 Try with Sample Questions</button>
+    </div>
+</div>
 
-    <!-- Shortcuts Modal -->
-    <div class="modal-overlay" id="shortcutsModal">
-        <div class="modal-content">
-            <h3>Keyboard Shortcuts</h3>
-            <div class="shortcut-list">
-                <div class="shortcut-item"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd> Select option A/B/C/D</div>
-                <div class="shortcut-item"><kbd>N</kbd> Next question</div>
-                <div class="shortcut-item"><kbd>P</kbd> Previous question</div>
-                <div class="shortcut-item"><kbd>S</kbd> Skip question</div>
-                <div class="shortcut-item"><kbd>Enter</kbd> Submit answer</div>
-                <div class="shortcut-item"><kbd>D</kbd> Toggle dark/light mode</div>
-                <div class="shortcut-item"><kbd>Esc</kbd> Close modals</div>
+<!-- ========== EXAM SCREEN ========== -->
+<div class="screen" id="examScreen">
+    <!-- Header -->
+    <div class="exam-header">
+        <div class="exam-title">
+            <div class="exam-icon">📝</div>
+            <span id="examTitle">Practice Test</span>
+        </div>
+        <div class="header-right">
+            <div class="timer-box" id="timerBox">
+                ⏱️ <span id="timerDisplay">00:00</span>
             </div>
-            <button class="btn btn-primary" onclick="document.getElementById('shortcutsModal').classList.remove('active')">Got it!</button>
+            <button class="btn-submit-exam" id="btnFinish">Submit Test</button>
         </div>
     </div>
-
-    <!-- Main App Container -->
-    <div class="app-container">
-
-        <!-- ===== UPLOAD SCREEN ===== -->
-        <section class="screen active" id="uploadScreen">
-            <div class="upload-container">
-                <div class="logo">
-                    <div class="logo-icon">&#128218;</div>
-                    <h1>QuizMaster Pro</h1>
-                    <p class="tagline">Upload your PDF, practice smart, master everything.</p>
+    
+    <!-- Subject Tabs -->
+    <div class="subject-tabs" id="subjectTabs"></div>
+    
+    <!-- Content -->
+    <div class="exam-content">
+        <!-- Question Panel -->
+        <div class="question-panel">
+            <div class="question-area">
+                <div class="q-header">
+                    <span class="q-number" id="qNumber">Question 1</span>
+                    <span class="q-marks">Marks: <span>+1</span> | <span style="color:#f44336;">-0</span></span>
                 </div>
-
-                <div class="upload-area" id="uploadArea">
-                    <div class="upload-icon">&#128196;</div>
-                    <h3>Drop your Question PDF here</h3>
-                    <p>or click to browse files</p>
-                    <input type="file" id="pdfInput" accept=".pdf" hidden>
-                    <div class="upload-formats">Supports: PDF files with MCQ questions</div>
+                <div class="q-text" id="qText">Loading question...</div>
+                <div class="options-list" id="optionsList"></div>
+                
+                <!-- Feedback -->
+                <div class="feedback-box" id="feedbackBox">
+                    <span id="feedbackIcon">✓</span>
+                    <span id="feedbackMsg">Correct!</span>
                 </div>
-
-                <div class="upload-progress" id="uploadProgress">
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="progressFill"></div>
-                    </div>
-                    <p class="progress-text" id="progressText">Extracting questions...</p>
-                </div>
-
-                <div class="or-divider">
-                    <span>OR</span>
-                </div>
-
-                <button class="btn btn-secondary" id="loadSampleBtn">
-                    &#127919; Try with Sample Questions
-                </button>
-            </div>
-        </section>
-
-        <!-- ===== QUIZ SCREEN ===== -->
-        <section class="screen" id="quizScreen">
-            <!-- Top Bar -->
-            <header class="quiz-header">
-                <div class="header-left">
-                    <span class="topic-badge" id="topicBadge">Topic: General</span>
-                </div>
-                <div class="header-center">
-                    <div class="progress-info">
-                        <span id="currentQNum">1</span> / <span id="totalQNum">10</span>
-                    </div>
-                    <div class="progress-bar-mini">
-                        <div class="progress-fill-mini" id="quizProgressFill"></div>
-                    </div>
-                </div>
-                <div class="header-right">
-                    <div class="timer" id="timer">
-                        <span class="timer-icon">&#9201;</span>
-                        <span class="timer-value" id="timerValue">00:00</span>
-                    </div>
-                </div>
-            </header>
-
-            <!-- Quiz Body -->
-            <main class="quiz-body">
-                <div class="question-card">
-                    <!-- Question -->
-                    <div class="question-section">
-                        <div class="question-number" id="questionNumber">Q1</div>
-                        <h2 class="question-text" id="questionText">What is the capital of France?</h2>
-                        <div class="question-category" id="questionCategory">
-                            <span class="category-tag">Category: Geography</span>
-                        </div>
-                    </div>
-
-                    <!-- Options -->
-                    <div class="options-container" id="optionsContainer">
-                        <button class="option-btn" data-index="0">
-                            <span class="option-key">A</span>
-                            <span class="option-text">Option 1</span>
-                        </button>
-                        <button class="option-btn" data-index="1">
-                            <span class="option-key">B</span>
-                            <span class="option-text">Option 2</span>
-                        </button>
-                        <button class="option-btn" data-index="2">
-                            <span class="option-key">C</span>
-                            <span class="option-text">Option 3</span>
-                        </button>
-                        <button class="option-btn" data-index="3">
-                            <span class="option-key">D</span>
-                            <span class="option-text">Option 4</span>
-                        </button>
-                    </div>
-
-                    <!-- Submit Button -->
-                    <div class="submit-section" id="submitSection">
-                        <button class="btn btn-primary btn-submit" id="submitBtn" disabled>
-                            Submit Answer
-                        </button>
-                    </div>
-
-                    <!-- Feedback Area (shown after answer) -->
-                    <div class="feedback-section" id="feedbackSection">
-                        <div class="feedback-banner" id="feedbackBanner">
-                            <span class="feedback-icon" id="feedbackIcon"></span>
-                            <span class="feedback-text" id="feedbackText"></span>
-                        </div>
-                    </div>
-
-                    <!-- Solution Area (shown after answer, scrollable) -->
-                    <div class="solution-section" id="solutionSection">
-                        <button class="btn btn-outline show-solution-btn" id="showSolutionBtn">
-                            &#128161; Show Solution
-                        </button>
-                        <div class="solution-content" id="solutionContent">
-                            <h4>&#128161; Solution</h4>
-                            <p id="solutionText"></p>
-                        </div>
-                    </div>
-                </div>
-            </main>
-
-            <!-- Navigation Footer -->
-            <footer class="quiz-footer">
-                <button class="btn btn-nav" id="prevBtn">
-                    &#8592; Previous
-                </button>
-                <button class="btn btn-nav btn-skip" id="skipBtn">
-                    Skip &#8631;
-                </button>
-                <button class="btn btn-nav btn-next" id="nextBtn">
-                    Next &#8594;
-                </button>
-                <button class="btn btn-primary btn-finish" id="finishBtn" style="display:none;">
-                    &#127937; Finish Quiz
-                </button>
-            </footer>
-        </section>
-
-        <!-- ===== RESULTS SCREEN ===== -->
-        <section class="screen" id="resultsScreen">
-            <div class="results-container">
-                <h2 class="results-title">&#127942; Quiz Complete!</h2>
-
-                <!-- Score Overview -->
-                <div class="score-overview">
-                    <div class="score-circle">
-                        <svg viewBox="0 0 120 120">
-                            <circle class="score-bg" cx="60" cy="60" r="54"></circle>
-                            <circle class="score-fill" id="scoreFill" cx="60" cy="60" r="54"></circle>
-                        </svg>
-                        <div class="score-text">
-                            <span class="score-value" id="scoreValue">0%</span>
-                            <span class="score-label">Score</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Stats Cards -->
-                <div class="stats-grid">
-                    <div class="stat-card stat-correct">
-                        <div class="stat-number" id="statCorrect">0</div>
-                        <div class="stat-label">Correct</div>
-                    </div>
-                    <div class="stat-card stat-wrong">
-                        <div class="stat-number" id="statWrong">0</div>
-                        <div class="stat-label">Wrong</div>
-                    </div>
-                    <div class="stat-card stat-skipped">
-                        <div class="stat-number" id="statSkipped">0</div>
-                        <div class="stat-label">Skipped</div>
-                    </div>
-                    <div class="stat-card stat-time">
-                        <div class="stat-number" id="statAvgTime">0s</div>
-                        <div class="stat-label">Avg Time</div>
-                    </div>
-                </div>
-
-                <!-- Category Breakdown -->
-                <div class="category-breakdown" id="categoryBreakdown">
-                    <h3>&#128202; Category Breakdown</h3>
-                    <div class="category-list" id="categoryList"></div>
-                </div>
-
-                <!-- Detailed Results Table -->
-                <div class="results-table-section">
-                    <h3>&#128203; Detailed Results</h3>
-                    <div class="results-table-wrapper">
-                        <table class="results-table">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Question</th>
-                                    <th>Your Answer</th>
-                                    <th>Correct</th>
-                                    <th>Time</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody id="resultsTableBody"></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Action Buttons -->
-                <div class="results-actions">
-                    <button class="btn btn-primary" id="retryBtn">&#128260; Retry Quiz</button>
-                    <button class="btn btn-secondary" id="exportJsonBtn">&#128229; Export JSON</button>
-                    <button class="btn btn-secondary" id="newQuizBtn">&#128196; New Quiz</button>
+                
+                <!-- Solution -->
+                <button class="btn-solution" id="btnShowSolution" style="display:none;">💡 View Solution</button>
+                <div class="solution-box" id="solutionBox">
+                    <h4>💡 Solution</h4>
+                    <p id="solutionText"></p>
                 </div>
             </div>
-        </section>
+            
+            <!-- Navigation Bar -->
+            <div class="nav-bar">
+                <div class="nav-left">
+                    <button class="nav-btn btn-mark" id="btnMark">⚑ Mark for Review</button>
+                    <button class="nav-btn btn-clear" id="btnClear">✕ Clear Response</button>
+                </div>
+                <div class="nav-right">
+                    <button class="nav-btn btn-prev" id="btnPrev">← Previous</button>
+                    <button class="nav-btn btn-save-next" id="btnNext">Save & Next →</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Right Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">Question Palette</div>
+            <div class="sidebar-legend">
+                <div class="legend-item"><div class="legend-dot answered">1</div> Answered</div>
+                <div class="legend-item"><div class="legend-dot not-answered">1</div> Not Answered</div>
+                <div class="legend-item"><div class="legend-dot marked">1</div> Marked</div>
+                <div class="legend-item"><div class="legend-dot not-visited">1</div> Not Visited</div>
+                <div class="legend-item"><div class="legend-dot current">1</div> Current</div>
+            </div>
+            <div class="palette-grid" id="paletteGrid"></div>
+        </div>
     </div>
+</div>
 
-    <!-- Scripts -->
-    <script src="pdf-parser.js"></script>
-    <script src="app.js"></script>
+<!-- ========== RESULTS SCREEN ========== -->
+<div class="screen" id="resultsScreen">
+    <div class="results-wrapper">
+        <div class="results-header">
+            <h1>📊 Test Analysis</h1>
+            <p>Here's how you performed</p>
+        </div>
+        
+        <div class="score-banner">
+            <div class="big-score" id="bigScore">0%</div>
+            <div class="score-subtitle">Overall Score</div>
+        </div>
+        
+        <div class="score-cards">
+            <div class="score-card correct"><div class="num" id="rCorrect">0</div><div class="label">Correct</div></div>
+            <div class="score-card wrong"><div class="num" id="rWrong">0</div><div class="label">Incorrect</div></div>
+            <div class="score-card skipped"><div class="num" id="rSkipped">0</div><div class="label">Unattempted</div></div>
+            <div class="score-card time"><div class="num" id="rTime">0s</div><div class="label">Avg Time/Q</div></div>
+        </div>
+        
+        <table class="results-table">
+            <thead><tr><th>#</th><th>Question</th><th>Your Answer</th><th>Correct Answer</th><th>Time</th><th>Status</th></tr></thead>
+            <tbody id="resultsBody"></tbody>
+        </table>
+        
+        <div class="results-actions">
+            <button class="btn-sample" id="btnRetry">🔄 Retry Test</button>
+            <button class="btn-outline-r" id="btnExport">📥 Export JSON</button>
+            <button class="btn-outline-r" id="btnNewQuiz">📄 New Test</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ===== PDF PARSER =====
+class PDFQuestionParser {
+    constructor() {
+        if (typeof pdfjsLib !== 'undefined') {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+    }
+    async parsePDF(file, onProgress) {
+        onProgress(10, 'Reading PDF...');
+        const ab = await file.arrayBuffer();
+        onProgress(20, 'Loading document...');
+        const pdf = await pdfjsLib.getDocument({data:ab}).promise;
+        let fullText = '';
+        for (let i=1; i<=pdf.numPages; i++) {
+            onProgress(20 + (i/pdf.numPages)*40, `Page ${i}/${pdf.numPages}...`);
+            const page = await pdf.getPage(i);
+            const tc = await page.getTextContent();
+            fullText += tc.items.map(x=>x.str).join(' ') + '\n\n';
+        }
+        onProgress(65, 'Detecting questions...');
+        const questions = this.extract(fullText);
+        onProgress(90, 'Categorizing...');
+        return this.categorize(questions);
+    }
+    extract(text) {
+        text = text.replace(/\s+/g,' ').trim();
+        const qs = [];
+        // Try numbered pattern: "1." or "Q1."
+        const blocks = text.split(/(?=(?:^|\s)(?:Q(?:uestion)?[\s.]*)?(\d+)[.)]\s)/i);
+        let currentBlock = '';
+        for (const b of blocks) {
+            if (/^\d+$/.test(b.trim())) { if(currentBlock) { const p=this.parseBlock(currentBlock); if(p)qs.push(p); } currentBlock=''; }
+            else { currentBlock += b + ' '; }
+        }
+        if(currentBlock){const p=this.parseBlock(currentBlock);if(p)qs.push(p);}
+        if(qs.length>=2) return qs;
+        // Fallback: find questions with ?
+        const sentences = text.split(/(?<=[?])\s+/);
+        let q='',opts=[];
+        for(const s of sentences){
+            if(s.includes('?')){if(q&&opts.length>=2){qs.push({question:q,options:opts.slice(0,4),correctAnswer:0,explanation:''});}q=s.trim();opts=[];}
+            else{const m=s.match(/^[A-Da-d][.)]\s*(.*)/);if(m)opts.push(m[1].trim());}
+        }
+        if(q&&opts.length>=2)qs.push({question:q,options:opts.slice(0,4),correctAnswer:0,explanation:''});
+        return qs;
+    }
+    parseBlock(block) {
+        if(block.trim().length<10)return null;
+        const optMatch=[...block.matchAll(/([A-D])[.)]\s*([^\n]+)/gi)];
+        if(optMatch.length<2)return null;
+        const fi=block.indexOf(optMatch[0][0]);
+        let qText=block.substring(0,fi).trim().replace(/^\d+[.)]\s*/,'').replace(/^Q(?:uestion)?[\s.]*\d*[.):\s]*/i,'').trim();
+        if(qText.length<5)return null;
+        const options=optMatch.map(m=>m[2].trim()).slice(0,4);
+        let correct=0;
+        const ansM=block.match(/(?:answer|ans|correct)[:\s]*([A-D])/i);
+        if(ansM)correct=ansM[1].toUpperCase().charCodeAt(0)-65;
+        return {question:qText,options,correctAnswer:correct,explanation:''};
+    }
+    categorize(questions) {
+        const kw={Programming:['code','function','variable','loop','array','class','algorithm','programming'],Mathematics:['calculate','equation','formula','algebra','geometry','probability'],Science:['atom','molecule','cell','energy','force','gravity','physics','chemistry','biology'],Geography:['country','capital','continent','ocean','river','mountain','climate'],Technology:['computer','internet','network','database','server','cloud','HTML','CSS','JavaScript','HTTP'],History:['war','century','kingdom','empire','revolution','independence']};
+        return questions.map(q=>{
+            const t=(q.question+' '+q.options.join(' ')).toLowerCase();
+            let best='General',score=0;
+            for(const[cat,words]of Object.entries(kw)){const s=words.filter(w=>t.includes(w)).length;if(s>score){score=s;best=cat;}}
+            q.category=best;
+            if(!q.explanation)q.explanation=`The correct answer is "${q.options[q.correctAnswer]}". Review the relevant topic in your study material for detailed understanding.`;
+            return q;
+        });
+    }
+}
+
+// ===== STATE =====
+const state = {
+    questions:[],currentIndex:0,answers:[],timerInterval:null,timerSeconds:0,
+    quizStarted:false,categories:[]
+};
+
+// ===== DOM =====
+const $=id=>document.getElementById(id);
+
+// ===== SCREENS =====
+function showScreen(name){
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+    $(name+'Screen').classList.add('active');
+}
+
+// ===== UPLOAD =====
+$('uploadZone').addEventListener('click',()=>$('pdfInput').click());
+$('pdfInput').addEventListener('change',e=>{if(e.target.files[0])handleUpload(e.target.files[0]);});
+$('uploadZone').addEventListener('dragover',e=>{e.preventDefault();e.currentTarget.style.borderColor='#667eea';});
+$('uploadZone').addEventListener('dragleave',e=>{e.currentTarget.style.borderColor='#d0d5dd';});
+$('uploadZone').addEventListener('drop',e=>{e.preventDefault();e.currentTarget.style.borderColor='#d0d5dd';if(e.dataTransfer.files[0])handleUpload(e.dataTransfer.files[0]);});
+$('btnSample').addEventListener('click',loadSample);
+
+async function handleUpload(file){
+    if(file.type!=='application/pdf'){alert('Please upload a PDF file');return;}
+    $('uploadProgress').classList.add('active');
+    try{
+        const parser=new PDFQuestionParser();
+        const qs=await parser.parsePDF(file,(p,m)=>{$('progressFill').style.width=p+'%';$('progressMsg').textContent=m;});
+        if(qs.length<1){$('progressMsg').textContent='No questions found. Try sample questions.';return;}
+        setTimeout(()=>startExam(qs),300);
+    }catch(e){$('progressMsg').textContent='Error: '+e.message;}
+}
+
+// ===== SAMPLE QUESTIONS =====
+function loadSample(){
+    startExam([
+        {question:"What does HTML stand for?",options:["Hyper Text Markup Language","High Tech Modern Language","Hyper Transfer Markup Language","Home Tool Markup Language"],correctAnswer:0,category:"Technology",explanation:"HTML stands for HyperText Markup Language. It is the standard markup language for creating web pages."},
+        {question:"Which data structure uses LIFO (Last In, First Out) principle?",options:["Queue","Stack","Array","Linked List"],correctAnswer:1,category:"Programming",explanation:"A Stack uses LIFO. The last element added is the first one removed, like a stack of plates."},
+        {question:"What is the time complexity of binary search?",options:["O(n)","O(log n)","O(n log n)","O(1)"],correctAnswer:1,category:"Programming",explanation:"Binary search has O(log n) complexity because it halves the search space each step."},
+        {question:"Which planet is known as the Red Planet?",options:["Venus","Jupiter","Mars","Saturn"],correctAnswer:2,category:"Science",explanation:"Mars is called the Red Planet due to iron oxide (rust) on its surface."},
+        {question:"What is the capital of Japan?",options:["Seoul","Beijing","Tokyo","Bangkok"],correctAnswer:2,category:"Geography",explanation:"Tokyo is the capital of Japan and the world's most populous metropolitan area."},
+        {question:"In JavaScript, which keyword declares a block-scoped variable?",options:["var","let","function","global"],correctAnswer:1,category:"Programming",explanation:"'let' is block-scoped, unlike 'var' which is function-scoped."},
+        {question:"What does CSS stand for?",options:["Computer Style Sheets","Creative Style System","Cascading Style Sheets","Colorful Style Sheets"],correctAnswer:2,category:"Technology",explanation:"CSS = Cascading Style Sheets. It styles HTML elements on web pages."},
+        {question:"Which sorting algorithm has O(n log n) average complexity?",options:["Bubble Sort","Merge Sort","Selection Sort","Insertion Sort"],correctAnswer:1,category:"Programming",explanation:"Merge Sort uses divide-and-conquer to achieve O(n log n) in all cases."},
+        {question:"What is the speed of light approximately?",options:["300,000 km/s","150,000 km/s","500,000 km/s","100,000 km/s"],correctAnswer:0,category:"Science",explanation:"Light travels at ~299,792 km/s (≈300,000 km/s) in a vacuum."},
+        {question:"Which HTTP status code means 'Not Found'?",options:["200","301","404","500"],correctAnswer:2,category:"Technology",explanation:"404 = Not Found. 200=OK, 301=Redirect, 500=Server Error."},
+        {question:"What is the largest ocean on Earth?",options:["Atlantic Ocean","Indian Ocean","Arctic Ocean","Pacific Ocean"],correctAnswer:3,category:"Geography",explanation:"The Pacific Ocean covers ~165 million km² — larger than all land combined."},
+        {question:"In Python, which function gets the length of a list?",options:["size()","length()","len()","count()"],correctAnswer:2,category:"Programming",explanation:"len() returns the number of items. Example: len([1,2,3]) = 3."},
+        {question:"What does SQL stand for?",options:["Structured Query Language","Simple Question Language","System Query Logic","Standard Query Loop"],correctAnswer:0,category:"Technology",explanation:"SQL = Structured Query Language, used to manage relational databases."},
+        {question:"Which gas do plants absorb from the atmosphere?",options:["Oxygen","Nitrogen","Carbon Dioxide","Hydrogen"],correctAnswer:2,category:"Science",explanation:"Plants absorb CO₂ during photosynthesis and release oxygen."},
+        {question:"What is the smallest prime number?",options:["0","1","2","3"],correctAnswer:2,category:"Mathematics",explanation:"2 is the smallest and only even prime number."}
+    ]);
+}
+
+// ===== START EXAM =====
+function startExam(questions){
+    state.questions=questions;
+    state.currentIndex=0;
+    state.answers=questions.map(()=>({selected:-1,status:'not-visited',timeTaken:0,isCorrect:false}));
+    state.quizStarted=true;
+    state.timerSeconds=0;
+    
+    // Get unique categories
+    state.categories=[...new Set(questions.map(q=>q.category||'General'))];
+    
+    // Setup subject tabs
+    const tabs=$('subjectTabs');
+    tabs.innerHTML='<div class="subject-tab active" data-cat="all">All Questions</div>';
+    state.categories.forEach(c=>{tabs.innerHTML+=`<div class="subject-tab" data-cat="${c}">${c}</div>`;});
+    tabs.querySelectorAll('.subject-tab').forEach(t=>t.addEventListener('click',e=>{
+        tabs.querySelectorAll('.subject-tab').forEach(x=>x.classList.remove('active'));
+        e.target.classList.add('active');
+    }));
+    
+    // Build palette
+    buildPalette();
+    
+    // Show exam
+    showScreen('exam');
+    $('examTitle').textContent=`Practice Test — ${questions.length} Questions`;
+    
+    // Start timer
+    startTimer();
+    
+    // Load first question
+    state.answers[0].status='not-answered';
+    loadQ(0);
+}
+
+function buildPalette(){
+    const grid=$('paletteGrid');
+    grid.innerHTML='';
+    state.questions.forEach((_,i)=>{
+        const btn=document.createElement('button');
+        btn.className='palette-btn not-visited';
+        btn.textContent=i+1;
+        btn.addEventListener('click',()=>goTo(i));
+        grid.appendChild(btn);
+    });
+}
+
+function updatePalette(){
+    const btns=$('paletteGrid').querySelectorAll('.palette-btn');
+    btns.forEach((btn,i)=>{
+        btn.className='palette-btn';
+        const a=state.answers[i];
+        if(i===state.currentIndex){btn.classList.add('current');}
+        else if(a.status==='answered')btn.classList.add('answered');
+        else if(a.status==='wrong-answer')btn.classList.add('wrong-answer');
+        else if(a.status==='marked')btn.classList.add('marked');
+        else if(a.status==='not-answered')btn.classList.add('not-answered');
+        else btn.classList.add('not-visited');
+    });
+}
+
+// ===== LOAD QUESTION =====
+function loadQ(index){
+    state.currentIndex=index;
+    const q=state.questions[index];
+    const a=state.answers[index];
+    if(a.status==='not-visited')a.status='not-answered';
+    
+    // Reset per-question timer display
+    state.timerSeconds=a.timeTaken||0;
+    $('timerDisplay').textContent=formatTime(state.timerSeconds);
+    $('timerBox').className='timer-box';
+    
+    $('qNumber').textContent=`Question ${index+1} of ${state.questions.length}`;
+    $('qText').textContent=q.question;
+    
+    // Render options
+    const list=$('optionsList');
+    list.innerHTML='';
+    const keys=['A','B','C','D'];
+    const isLocked=(a.status==='answered'||a.status==='wrong-answer');
+    
+    q.options.forEach((opt,i)=>{
+        const div=document.createElement('div');
+        div.className='option-item';
+        if(isLocked)div.classList.add('disabled');
+        if(a.selected===i)div.classList.add('selected');
+        if(isLocked&&i===q.correctAnswer)div.classList.add('correct');
+        if(isLocked&&a.selected===i&&!a.isCorrect)div.classList.add('wrong');
+        
+        div.innerHTML=`<div class="option-radio"></div><span class="option-label">${keys[i]}.</span><span class="option-text">${opt}</span>`;
+        if(!isLocked){
+            div.addEventListener('click',()=>selectOption(i));
+        }
+        list.appendChild(div);
+    });
+    
+    // Feedback
+    const fb=$('feedbackBox');
+    fb.classList.remove('active','correct','wrong');
+    if(isLocked){
+        fb.classList.add('active',a.isCorrect?'correct':'wrong');
+        $('feedbackIcon').textContent=a.isCorrect?'✓':'✗';
+        $('feedbackMsg').textContent=a.isCorrect?'Correct! Well done.':'Incorrect. See the solution below.';
+        $('btnShowSolution').style.display='inline-block';
+    }else{
+        $('btnShowSolution').style.display='none';
+    }
+    
+    // Solution
+    $('solutionBox').classList.remove('active');
+    $('solutionText').textContent=q.explanation||'';
+    
+    updatePalette();
+}
+
+function selectOption(i){
+    const a=state.answers[state.currentIndex];
+    if(a.status==='answered'||a.status==='wrong-answer')return;
+    a.selected=i;
+    // Re-render options to show selection
+    const items=$('optionsList').querySelectorAll('.option-item');
+    items.forEach((el,idx)=>{el.classList.toggle('selected',idx===i);});
+}
+
+// ===== SAVE & NEXT =====
+function saveAndNext(){
+    const a=state.answers[state.currentIndex];
+    const q=state.questions[state.currentIndex];
+    
+    // Save time
+    a.timeTaken=state.timerSeconds;
+    
+    // If an option is selected and not yet graded, grade it
+    if(a.selected>=0 && a.status!=='answered' && a.status!=='wrong-answer'){
+        a.isCorrect=(a.selected===q.correctAnswer);
+        a.status=a.isCorrect?'answered':'wrong-answer';
+        // Show feedback immediately
+        loadQ(state.currentIndex);
+        return; // User sees feedback, clicks next again to proceed
+    }
+    
+    // Move to next
+    if(state.currentIndex<state.questions.length-1){
+        goTo(state.currentIndex+1);
+    }
+}
+
+function goTo(index){
+    // Save current time
+    state.answers[state.currentIndex].timeTaken=state.timerSeconds;
+    state.currentIndex=index;
+    // Reset timer for new question
+    state.timerSeconds=state.answers[index].timeTaken||0;
+    loadQ(index);
+}
+
+// ===== NAVIGATION HANDLERS =====
+$('btnNext').addEventListener('click',saveAndNext);
+$('btnPrev').addEventListener('click',()=>{if(state.currentIndex>0)goTo(state.currentIndex-1);});
+$('btnMark').addEventListener('click',()=>{
+    const a=state.answers[state.currentIndex];
+    if(a.status!=='answered'&&a.status!=='wrong-answer')a.status='marked';
+    updatePalette();
+});
+$('btnClear').addEventListener('click',()=>{
+    const a=state.answers[state.currentIndex];
+    if(a.status!=='answered'&&a.status!=='wrong-answer'){a.selected=-1;a.status='not-answered';loadQ(state.currentIndex);}
+});
+$('btnShowSolution').addEventListener('click',()=>{$('solutionBox').classList.add('active');$('btnShowSolution').style.display='none';});
+$('btnFinish').addEventListener('click',finishExam);
+
+// ===== TIMER =====
+function startTimer(){
+    stopTimer();
+    state.timerInterval=setInterval(()=>{
+        state.timerSeconds++;
+        $('timerDisplay').textContent=formatTime(state.timerSeconds);
+        if(state.timerSeconds>=60)$('timerBox').className='timer-box danger';
+        else if(state.timerSeconds>=30)$('timerBox').className='timer-box warning';
+        else $('timerBox').className='timer-box';
+    },1000);
+}
+function stopTimer(){if(state.timerInterval){clearInterval(state.timerInterval);state.timerInterval=null;}}
+function formatTime(s){return Math.floor(s/60).toString().padStart(2,'0')+':'+((s%60).toString().padStart(2,'0'));}
+
+// ===== KEYBOARD SHORTCUTS =====
+document.addEventListener('keydown',e=>{
+    if(!state.quizStarted||!$('examScreen').classList.contains('active'))return;
+    switch(e.key){
+        case '1':selectOption(0);break;
+        case '2':selectOption(1);break;
+        case '3':selectOption(2);break;
+        case '4':selectOption(3);break;
+        case 'Enter':e.preventDefault();saveAndNext();break;
+        case 'ArrowRight':case 'n':case 'N':if(state.currentIndex<state.questions.length-1)goTo(state.currentIndex+1);break;
+        case 'ArrowLeft':case 'p':case 'P':if(state.currentIndex>0)goTo(state.currentIndex-1);break;
+        case 's':case 'S':
+            const a=state.answers[state.currentIndex];
+            if(a.status!=='answered'&&a.status!=='wrong-answer'){a.status='marked';updatePalette();}
+            break;
+    }
+});
+
+// ===== FINISH EXAM =====
+function finishExam(){
+    stopTimer();
+    state.answers[state.currentIndex].timeTaken=state.timerSeconds;
+    state.quizStarted=false;
+    showScreen('results');
+    renderResults();
+}
+
+function renderResults(){
+    const total=state.questions.length;
+    const correct=state.answers.filter(a=>a.isCorrect).length;
+    const wrong=state.answers.filter(a=>a.status==='wrong-answer').length;
+    const skipped=total-correct-wrong;
+    const answered=state.answers.filter(a=>a.status==='answered'||a.status==='wrong-answer');
+    const totalTime=answered.reduce((s,a)=>s+a.timeTaken,0);
+    const avgTime=answered.length?Math.round(totalTime/answered.length):0;
+    const pct=Math.round((correct/total)*100);
+    
+    $('bigScore').textContent=pct+'%';
+    $('rCorrect').textContent=correct;
+    $('rWrong').textContent=wrong;
+    $('rSkipped').textContent=skipped;
+    $('rTime').textContent=avgTime+'s';
+    
+    // Table
+    const tbody=$('resultsBody');
+    tbody.innerHTML='';
+    const keys=['A','B','C','D'];
+    state.questions.forEach((q,i)=>{
+        const a=state.answers[i];
+        const yours=a.selected>=0?keys[a.selected]+'. '+q.options[a.selected]:'—';
+        const corr=keys[q.correctAnswer]+'. '+q.options[q.correctAnswer];
+        let badge='';
+        if(a.isCorrect)badge='<span class="status-badge correct">✓ Correct</span>';
+        else if(a.status==='wrong-answer')badge='<span class="status-badge wrong">✗ Wrong</span>';
+        else badge='<span class="status-badge skipped">— Skipped</span>';
+        tbody.innerHTML+=`<tr><td>${i+1}</td><td>${q.question.substring(0,60)}${q.question.length>60?'...':''}</td><td>${yours}</td><td>${corr}</td><td>${formatTime(a.timeTaken)}</td><td>${badge}</td></tr>`;
+    });
+}
+
+// ===== RESULTS ACTIONS =====
+$('btnRetry').addEventListener('click',()=>startExam(state.questions));
+$('btnNewQuiz').addEventListener('click',()=>{showScreen('upload');$('uploadProgress').classList.remove('active');});
+$('btnExport').addEventListener('click',()=>{
+    const data={date:new Date().toISOString(),total:state.questions.length,
+        score:{correct:state.answers.filter(a=>a.isCorrect).length,wrong:state.answers.filter(a=>a.status==='wrong-answer').length},
+        details:state.questions.map((q,i)=>({q:q.question,category:q.category,yourAnswer:state.answers[i].selected>=0?q.options[state.answers[i].selected]:'—',correct:q.options[q.correctAnswer],time:state.answers[i].timeTaken+'s',status:state.answers[i].isCorrect?'correct':state.answers[i].status==='wrong-answer'?'wrong':'skipped'}))
+    };
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='quiz-results.json';a.click();
+});
+</script>
 </body>
 </html>
