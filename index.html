@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuizMaster Pro - Interactive Quiz Platform</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+    <!-- Theme Toggle -->
+    <button class="theme-toggle" id="themeToggle" title="Toggle Dark/Light Mode">
+        <span class="theme-icon">&#127769;</span>
+    </button>
+
+    <!-- Keyboard Shortcuts Help -->
+    <button class="shortcuts-btn" id="shortcutsBtn" title="Keyboard Shortcuts">
+        <span>&#9000;</span>
+    </button>
+
+    <!-- Shortcuts Modal -->
+    <div class="modal-overlay" id="shortcutsModal">
+        <div class="modal-content">
+            <h3>Keyboard Shortcuts</h3>
+            <div class="shortcut-list">
+                <div class="shortcut-item"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd> Select option A/B/C/D</div>
+                <div class="shortcut-item"><kbd>N</kbd> Next question</div>
+                <div class="shortcut-item"><kbd>P</kbd> Previous question</div>
+                <div class="shortcut-item"><kbd>S</kbd> Skip question</div>
+                <div class="shortcut-item"><kbd>Enter</kbd> Submit answer</div>
+                <div class="shortcut-item"><kbd>D</kbd> Toggle dark/light mode</div>
+                <div class="shortcut-item"><kbd>Esc</kbd> Close modals</div>
+            </div>
+            <button class="btn btn-primary" onclick="document.getElementById('shortcutsModal').classList.remove('active')">Got it!</button>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div class="app-container">
+
+        <!-- ===== UPLOAD SCREEN ===== -->
+        <section class="screen active" id="uploadScreen">
+            <div class="upload-container">
+                <div class="logo">
+                    <div class="logo-icon">&#128218;</div>
+                    <h1>QuizMaster Pro</h1>
+                    <p class="tagline">Upload your PDF, practice smart, master everything.</p>
+                </div>
+
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">&#128196;</div>
+                    <h3>Drop your Question PDF here</h3>
+                    <p>or click to browse files</p>
+                    <input type="file" id="pdfInput" accept=".pdf" hidden>
+                    <div class="upload-formats">Supports: PDF files with MCQ questions</div>
+                </div>
+
+                <div class="upload-progress" id="uploadProgress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <p class="progress-text" id="progressText">Extracting questions...</p>
+                </div>
+
+                <div class="or-divider">
+                    <span>OR</span>
+                </div>
+
+                <button class="btn btn-secondary" id="loadSampleBtn">
+                    &#127919; Try with Sample Questions
+                </button>
+            </div>
+        </section>
+
+        <!-- ===== QUIZ SCREEN ===== -->
+        <section class="screen" id="quizScreen">
+            <!-- Top Bar -->
+            <header class="quiz-header">
+                <div class="header-left">
+                    <span class="topic-badge" id="topicBadge">Topic: General</span>
+                </div>
+                <div class="header-center">
+                    <div class="progress-info">
+                        <span id="currentQNum">1</span> / <span id="totalQNum">10</span>
+                    </div>
+                    <div class="progress-bar-mini">
+                        <div class="progress-fill-mini" id="quizProgressFill"></div>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div class="timer" id="timer">
+                        <span class="timer-icon">&#9201;</span>
+                        <span class="timer-value" id="timerValue">00:00</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Quiz Body -->
+            <main class="quiz-body">
+                <div class="question-card">
+                    <!-- Question -->
+                    <div class="question-section">
+                        <div class="question-number" id="questionNumber">Q1</div>
+                        <h2 class="question-text" id="questionText">What is the capital of France?</h2>
+                        <div class="question-category" id="questionCategory">
+                            <span class="category-tag">Category: Geography</span>
+                        </div>
+                    </div>
+
+                    <!-- Options -->
+                    <div class="options-container" id="optionsContainer">
+                        <button class="option-btn" data-index="0">
+                            <span class="option-key">A</span>
+                            <span class="option-text">Option 1</span>
+                        </button>
+                        <button class="option-btn" data-index="1">
+                            <span class="option-key">B</span>
+                            <span class="option-text">Option 2</span>
+                        </button>
+                        <button class="option-btn" data-index="2">
+                            <span class="option-key">C</span>
+                            <span class="option-text">Option 3</span>
+                        </button>
+                        <button class="option-btn" data-index="3">
+                            <span class="option-key">D</span>
+                            <span class="option-text">Option 4</span>
+                        </button>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="submit-section" id="submitSection">
+                        <button class="btn btn-primary btn-submit" id="submitBtn" disabled>
+                            Submit Answer
+                        </button>
+                    </div>
+
+                    <!-- Feedback Area (shown after answer) -->
+                    <div class="feedback-section" id="feedbackSection">
+                        <div class="feedback-banner" id="feedbackBanner">
+                            <span class="feedback-icon" id="feedbackIcon"></span>
+                            <span class="feedback-text" id="feedbackText"></span>
+                        </div>
+                    </div>
+
+                    <!-- Solution Area (shown after answer, scrollable) -->
+                    <div class="solution-section" id="solutionSection">
+                        <button class="btn btn-outline show-solution-btn" id="showSolutionBtn">
+                            &#128161; Show Solution
+                        </button>
+                        <div class="solution-content" id="solutionContent">
+                            <h4>&#128161; Solution</h4>
+                            <p id="solutionText"></p>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Navigation Footer -->
+            <footer class="quiz-footer">
+                <button class="btn btn-nav" id="prevBtn">
+                    &#8592; Previous
+                </button>
+                <button class="btn btn-nav btn-skip" id="skipBtn">
+                    Skip &#8631;
+                </button>
+                <button class="btn btn-nav btn-next" id="nextBtn">
+                    Next &#8594;
+                </button>
+                <button class="btn btn-primary btn-finish" id="finishBtn" style="display:none;">
+                    &#127937; Finish Quiz
+                </button>
+            </footer>
+        </section>
+
+        <!-- ===== RESULTS SCREEN ===== -->
+        <section class="screen" id="resultsScreen">
+            <div class="results-container">
+                <h2 class="results-title">&#127942; Quiz Complete!</h2>
+
+                <!-- Score Overview -->
+                <div class="score-overview">
+                    <div class="score-circle">
+                        <svg viewBox="0 0 120 120">
+                            <circle class="score-bg" cx="60" cy="60" r="54"></circle>
+                            <circle class="score-fill" id="scoreFill" cx="60" cy="60" r="54"></circle>
+                        </svg>
+                        <div class="score-text">
+                            <span class="score-value" id="scoreValue">0%</span>
+                            <span class="score-label">Score</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card stat-correct">
+                        <div class="stat-number" id="statCorrect">0</div>
+                        <div class="stat-label">Correct</div>
+                    </div>
+                    <div class="stat-card stat-wrong">
+                        <div class="stat-number" id="statWrong">0</div>
+                        <div class="stat-label">Wrong</div>
+                    </div>
+                    <div class="stat-card stat-skipped">
+                        <div class="stat-number" id="statSkipped">0</div>
+                        <div class="stat-label">Skipped</div>
+                    </div>
+                    <div class="stat-card stat-time">
+                        <div class="stat-number" id="statAvgTime">0s</div>
+                        <div class="stat-label">Avg Time</div>
+                    </div>
+                </div>
+
+                <!-- Category Breakdown -->
+                <div class="category-breakdown" id="categoryBreakdown">
+                    <h3>&#128202; Category Breakdown</h3>
+                    <div class="category-list" id="categoryList"></div>
+                </div>
+
+                <!-- Detailed Results Table -->
+                <div class="results-table-section">
+                    <h3>&#128203; Detailed Results</h3>
+                    <div class="results-table-wrapper">
+                        <table class="results-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Question</th>
+                                    <th>Your Answer</th>
+                                    <th>Correct</th>
+                                    <th>Time</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="resultsTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="results-actions">
+                    <button class="btn btn-primary" id="retryBtn">&#128260; Retry Quiz</button>
+                    <button class="btn btn-secondary" id="exportJsonBtn">&#128229; Export JSON</button>
+                    <button class="btn btn-secondary" id="newQuizBtn">&#128196; New Quiz</button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Scripts -->
+    <script src="pdf-parser.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
