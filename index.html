@@ -316,44 +316,270 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 
 
 <script>
-// ===== PDF PARSER =====
+// ===== PDF PARSER (Improved - handles many formats) =====
 if(typeof pdfjsLib!=='undefined')pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-async function parsePDF(file,cb){
-    cb(10,'Reading...');const ab=await file.arrayBuffer();cb(20,'Loading...');
-    const pdf=await pdfjsLib.getDocument({data:ab}).promise;let txt='';
-    for(let i=1;i<=pdf.numPages;i++){cb(20+(i/pdf.numPages)*50,`Page ${i}/${pdf.numPages}`);const p=await pdf.getPage(i);const tc=await p.getTextContent();txt+=tc.items.map(x=>x.str).join(' ')+'\n';}
-    cb(75,'Detecting questions...');const qs=extractQs(txt);cb(95,'Done!');return categorize(qs);
+
+async function parsePDF(file, cb) {
+    cb(10, 'Reading PDF...');
+    const ab = await file.arrayBuffer();
+    cb(20, 'Loading document...');
+    const pdf = await pdfjsLib.getDocument({data: ab}).promise;
+    let lines = [];
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+        cb(20 + (i / pdf.numPages) * 45, `Extracting page ${i}/${pdf.numPages}...`);
+        const page = await pdf.getPage(i);
+        const tc = await page.getTextContent();
+        // Get text items with Y positions to detect line breaks
+        let lastY = null;
+        let currentLine = '';
+        for (const item of tc.items) {
+            const y = Math.round(item.transform[5]);
+            if (lastY !== null && Math.abs(y - lastY) > 5) {
+                if (currentLine.trim()) lines.push(currentLine.trim());
+                currentLine = '';
+            }
+            currentLine += item.str + ' ';
+            lastY = y;
+        }
+        if (currentLine.trim()) lines.push(currentLine.trim());
+        lines.push('---PAGE_BREAK---');
+    }
+
+    cb(70, 'Detecting questions...');
+    const rawText = lines.join('\n');
+    let qs = [];
+
+    // Strategy 1: Look for numbered questions with lettered options
+    qs = strategy1_numbered(lines);
+    if (qs.length >= 2) { cb(90, `Found ${qs.length} questions!`); return categorize(qs); }
+
+    // Strategy 2: Look for option patterns (a) (b) (c) (d) or A. B. C. D.
+    qs = strategy2_options(rawText);
+    if (qs.length >= 2) { cb(90, `Found ${qs.length} questions!`); return categorize(qs); }
+
+    // Strategy 3: Questions ending with ? followed by lines
+    qs = strategy3_questions(lines);
+    if (qs.length >= 2) { cb(90, `Found ${qs.length} questions!`); return categorize(qs); }
+
+    // Strategy 4: Aggressive - split by any numbering and look for 4 short items after
+    qs = strategy4_aggressive(lines);
+    if (qs.length >= 2) { cb(90, `Found ${qs.length} questions!`); return categorize(qs); }
+
+    // Strategy 5: Ultra fallback - split entire text into groups of 5 lines (1 question + 4 options)
+    qs = strategy5_lines(lines);
+    if (qs.length >= 1) { cb(90, `Found ${qs.length} questions (basic mode)!`); return categorize(qs); }
+
+    cb(100, 'No questions found');
+    return [];
 }
-function extractQs(text){
-    text=text.replace(/\s+/g,' ');const qs=[];
-    const blocks=text.split(/(?=(?:\s|^)(?:Q(?:uestion)?[\s.]*)?(\d+)[.)]\s)/i);
-    let blk='';for(const b of blocks){if(/^\d+$/.test(b.trim())){if(blk){const p=parseBlk(blk);if(p)qs.push(p);}blk='';}else blk+=b+' ';}
-    if(blk){const p=parseBlk(blk);if(p)qs.push(p);}
-    if(qs.length>=2)return qs;
-    // fallback
-    const parts=text.split(/(?<=[?])\s+/);let q='',opts=[];
-    for(const s of parts){if(s.includes('?')){if(q&&opts.length>=2)qs.push({question:q,options:opts.slice(0,4),correctAnswer:0,explanation:''});q=s;opts=[];}
-    else{const m=s.match(/^[A-Da-d][.)]\s*(.*)/);if(m)opts.push(m[1].trim());}}
-    if(q&&opts.length>=2)qs.push({question:q,options:opts.slice(0,4),correctAnswer:0,explanation:''});
+
+function strategy1_numbered(lines) {
+    const qs = [];
+    const text = lines.filter(l => l !== '---PAGE_BREAK---').join('\n');
+    // Split by question numbers: "1." "2." "Q1" "Q.1" "1)" etc.
+    const parts = text.split(/\n\s*(?:Q(?:uestion)?[\s.]*)?(\d+)\s*[.):\-]\s*/i);
+    
+    for (let i = 1; i < parts.length; i += 2) {
+        const block = (parts[i + 1] || '').trim();
+        if (!block) continue;
+        const parsed = parseBlock(block);
+        if (parsed) qs.push(parsed);
+    }
     return qs;
 }
-function parseBlk(b){
-    if(b.trim().length<10)return null;
-    const om=[...b.matchAll(/([A-D])[.)]\s*([^\n]+)/gi)];if(om.length<2)return null;
-    let qt=b.substring(0,b.indexOf(om[0][0])).trim().replace(/^\d+[.)]\s*/,'').replace(/^Q(?:uestion)?[\s.]*\d*[.):\s]*/i,'').trim();
-    if(qt.length<5)return null;const opts=om.map(m=>m[2].trim()).slice(0,4);
-    let ca=0;const am=b.match(/(?:answer|ans|correct)[:\s]*([A-D])/i);if(am)ca=am[1].toUpperCase().charCodeAt(0)-65;
-    return{question:qt,options:opts,correctAnswer:ca,explanation:''};
+
+function strategy2_options(text) {
+    const qs = [];
+    // Find blocks that have (a)...(b)...(c)...(d) or (A)...(B)...(C)...(D) or a)...b)...
+    const optionSets = text.split(/(?=(?:\n|^)\s*(?:\d+[.)]\s*|Q\d+[.:)\s]))/gi);
+    
+    for (const block of optionSets) {
+        const parsed = parseBlock(block);
+        if (parsed) qs.push(parsed);
+    }
+    
+    if (qs.length >= 2) return qs;
+    
+    // Try splitting by lines that look like options
+    const allOptions = [...text.matchAll(/(?:^|\n)\s*\(?([A-Da-d1-4])\)?[.):\s]+(.+?)(?=(?:\n\s*\(?[A-Da-d1-4]\)?[.):\s])|(?:\n\s*(?:Q|\d+[.)]))|$)/gs)];
+    if (allOptions.length >= 4) {
+        // Group every 4 options
+        for (let i = 0; i < allOptions.length - 3; i += 4) {
+            const optGroup = allOptions.slice(i, i + 4);
+            // The question is whatever is between previous group and this one
+            const startIdx = i > 0 ? allOptions[i-1].index + allOptions[i-1][0].length : 0;
+            const endIdx = optGroup[0].index;
+            const qText = text.substring(startIdx, endIdx).trim().replace(/^\d+[.):\s]+/, '').replace(/^Q\d+[.):\s]+/i, '').trim();
+            if (qText.length > 5) {
+                qs.push({
+                    question: qText.split('\n').filter(l=>l.trim()).join(' '),
+                    options: optGroup.map(m => m[2].trim()),
+                    correctAnswer: 0,
+                    explanation: ''
+                });
+            }
+        }
+    }
+    return qs;
 }
-function categorize(qs){
-    const kw={Programming:['code','function','variable','loop','array','class','algorithm','programming','python','javascript','java'],
-    Mathematics:['calculate','equation','formula','algebra','geometry','probability','number','sum','prime'],
-    Science:['atom','molecule','cell','energy','force','gravity','physics','chemistry','biology','planet','light','speed'],
-    Geography:['country','capital','continent','ocean','river','mountain','climate','largest','earth'],
-    Technology:['computer','internet','network','database','HTML','CSS','HTTP','SQL','server','cloud']};
-    return qs.map(q=>{const t=(q.question+' '+q.options.join(' ')).toLowerCase();let best='General',sc=0;
-    for(const[c,ws]of Object.entries(kw)){const s=ws.filter(w=>t.includes(w)).length;if(s>sc){sc=s;best=c;}}
-    q.category=best;if(!q.explanation)q.explanation=`The correct answer is "${q.options[q.correctAnswer]}". This is based on fundamental concepts in ${best}.`;return q;});
+
+function strategy3_questions(lines) {
+    const qs = [];
+    const cleaned = lines.filter(l => l !== '---PAGE_BREAK---');
+    let i = 0;
+    while (i < cleaned.length) {
+        const line = cleaned[i];
+        // Check if line contains a question (ends with ? or starts with number/Q)
+        if (line.includes('?') || /^\s*(?:Q\.?\s*\d+|\d+[.)]\s)/.test(line)) {
+            let qText = line.replace(/^\s*(?:Q\.?\s*\d+|\d+[.)]\s*)[.:)\s]*/, '').trim();
+            // Collect next lines as potential options
+            const opts = [];
+            let j = i + 1;
+            while (j < cleaned.length && opts.length < 4) {
+                const optLine = cleaned[j].trim();
+                // Check if it's an option (starts with A/B/C/D or a/b/c/d or 1/2/3/4 or has (a) pattern)
+                const optMatch = optLine.match(/^[\s]*(?:\(?([A-Da-d1-4])\)?[.):\-\s]+)(.+)/);
+                if (optMatch) {
+                    opts.push(optMatch[2].trim());
+                } else if (optLine.length > 0 && optLine.length < 100 && opts.length < 4 && !optLine.includes('?')) {
+                    // Short line after question could be an option
+                    opts.push(optLine);
+                } else {
+                    break;
+                }
+                j++;
+            }
+            if (opts.length >= 2) {
+                qs.push({ question: qText, options: opts.slice(0, 4), correctAnswer: 0, explanation: '' });
+                i = j;
+                continue;
+            }
+        }
+        i++;
+    }
+    return qs;
+}
+
+function strategy4_aggressive(lines) {
+    const qs = [];
+    const cleaned = lines.filter(l => l !== '---PAGE_BREAK---' && l.trim().length > 0);
+    
+    // Look for any line that could be a question (longer text) followed by shorter lines (options)
+    let i = 0;
+    while (i < cleaned.length - 2) {
+        const line = cleaned[i];
+        // A question candidate: longer than 20 chars, or contains ?, or starts with number
+        const isQCandidate = line.length > 25 || line.includes('?') || /^\d+[.)]\s/.test(line);
+        if (isQCandidate) {
+            // Look ahead for 2-4 shorter option-like lines
+            const opts = [];
+            let j = i + 1;
+            while (j < cleaned.length && j <= i + 6 && opts.length < 4) {
+                const nextLine = cleaned[j].trim();
+                const isOpt = nextLine.length < 80 && nextLine.length > 1 && (
+                    /^[\s]*(?:\(?[A-Da-d1-4]\)?[.):\-\s]+)/.test(nextLine) ||
+                    (nextLine.length < 50 && opts.length < 4)
+                );
+                if (isOpt) {
+                    opts.push(nextLine.replace(/^[\s]*(?:\(?[A-Da-d1-4]\)?[.):\-\s]+)/, '').trim() || nextLine);
+                } else break;
+                j++;
+            }
+            if (opts.length >= 2 && opts.length <= 4) {
+                const qText = line.replace(/^\s*(?:Q\.?\s*\d+|\d+[.)]\s*)[.:)\s]*/, '').trim();
+                if (qText.length >= 5) {
+                    qs.push({ question: qText, options: opts.slice(0, 4), correctAnswer: 0, explanation: '' });
+                    i = j;
+                    continue;
+                }
+            }
+        }
+        i++;
+    }
+    return qs;
+}
+
+function strategy5_lines(lines) {
+    // Last resort: treat every 5 non-empty lines as question + 4 options
+    const qs = [];
+    const cleaned = lines.filter(l => l !== '---PAGE_BREAK---' && l.trim().length > 1);
+    for (let i = 0; i + 4 < cleaned.length; i += 5) {
+        const q = cleaned[i].replace(/^\s*(?:Q\.?\s*\d+|\d+[.)]\s*)[.:)\s]*/, '').trim();
+        const opts = cleaned.slice(i + 1, i + 5).map(l => l.replace(/^[\s]*(?:\(?[A-Da-d1-4]\)?[.):\-\s]+)/, '').trim());
+        if (q.length >= 5 && opts.filter(o => o.length > 0).length >= 2) {
+            qs.push({ question: q, options: opts, correctAnswer: 0, explanation: '' });
+        }
+    }
+    return qs;
+}
+
+function parseBlock(block) {
+    if (!block || block.trim().length < 10) return null;
+    // Try multiple option patterns
+    const patterns = [
+        /\(?([A-D])\)?[.):\-\s]+([^\n(]+)/gi,        // (A) or A) or A. or A-
+        /\(?([a-d])\)?[.):\-\s]+([^\n(]+)/gi,        // (a) or a) or a.
+        /([1-4])[.):\-\s]+([^\n]+)/gi,                // 1) or 1.
+    ];
+    
+    let options = [];
+    let firstOptIdx = -1;
+    
+    for (const pat of patterns) {
+        const matches = [...block.matchAll(pat)];
+        if (matches.length >= 2 && matches.length <= 5) {
+            options = matches.map(m => m[2].trim()).slice(0, 4);
+            firstOptIdx = block.indexOf(matches[0][0]);
+            break;
+        }
+    }
+    
+    if (options.length < 2) return null;
+    
+    let qText = block.substring(0, firstOptIdx).trim();
+    qText = qText.replace(/^\d+[.):\-\s]+/, '').replace(/^Q(?:uestion)?[\s.]*\d*[.):\s]*/i, '').trim();
+    if (qText.length < 5) return null;
+    
+    // Check for correct answer markers
+    let ca = 0;
+    const ansPatterns = [/(?:answer|ans|correct|key)[:\s]*\(?([A-Da-d1-4])\)?/i, /\*([A-D])/i, /([A-D])\s*[✓✔★\*]/];
+    for (const ap of ansPatterns) {
+        const m = block.match(ap);
+        if (m) {
+            const v = m[1].toUpperCase();
+            if (v >= 'A' && v <= 'D') ca = v.charCodeAt(0) - 65;
+            else if (v >= '1' && v <= '4') ca = parseInt(v) - 1;
+            break;
+        }
+    }
+    
+    return { question: qText, options: options, correctAnswer: ca, explanation: '' };
+}
+
+function categorize(qs) {
+    const kw = {
+        Programming: ['code','function','variable','loop','array','class','algorithm','programming','python','javascript','java','compiler','syntax','pointer','recursion','stack','queue','linked','binary','tree','graph','oop','inheritance'],
+        Mathematics: ['calculate','equation','formula','algebra','geometry','probability','number','sum','prime','triangle','circle','angle','ratio','percentage','profit','loss','interest','speed','distance','time','average'],
+        Science: ['atom','molecule','cell','energy','force','gravity','physics','chemistry','biology','planet','light','speed','electron','neutron','acid','base','element','periodic','newton','mass','velocity'],
+        Geography: ['country','capital','continent','ocean','river','mountain','climate','largest','earth','population','state','district','lake','desert','island','forest'],
+        Technology: ['computer','internet','network','database','HTML','CSS','HTTP','SQL','server','cloud','RAM','CPU','operating','system','software','hardware','protocol','byte','pixel'],
+        History: ['war','battle','empire','king','queen','dynasty','independence','revolution','treaty','century','ancient','mughal','british','freedom','movement','constitution'],
+        'Reasoning': ['series','pattern','analogy','odd','mirror','direction','blood','relation','coding','decoding','arrangement','syllogism','puzzle','rank','position','sequence'],
+        'English': ['synonym','antonym','grammar','sentence','error','spelling','idiom','phrase','vocabulary','passage','comprehension','meaning','word','verb','noun','tense'],
+        'Current Affairs': ['minister','president','award','scheme','launched','appointed','committee','gdp','budget','policy','summit','agreement']
+    };
+    return qs.map(q => {
+        const t = (q.question + ' ' + q.options.join(' ')).toLowerCase();
+        let best = 'General', sc = 0;
+        for (const [c, ws] of Object.entries(kw)) {
+            const s = ws.filter(w => t.includes(w)).length;
+            if (s > sc) { sc = s; best = c; }
+        }
+        q.category = best;
+        if (!q.explanation) q.explanation = `The correct answer is "${q.options[q.correctAnswer]}". This is based on fundamental concepts in ${best}.`;
+        return q;
+    });
 }
 
 // ===== STATE =====
@@ -373,9 +599,16 @@ $('btnSample').onclick=loadSample;
 async function doUpload(f){
     if(f.type!=='application/pdf'){alert('PDF only');return;}
     $('upProgress').classList.add('show');
-    try{const qs=await parsePDF(f,(p,m)=>{$('upFill').style.width=p+'%';$('upMsg').textContent=m;});
-    if(!qs.length){$('upMsg').textContent='No questions found';return;}setTimeout(()=>startTest(qs),300);}
-    catch(e){$('upMsg').textContent='Error: '+e.message;}
+    try{
+        const qs=await parsePDF(f,(p,m)=>{$('upFill').style.width=p+'%';$('upMsg').textContent=m;});
+        if(!qs.length){
+            $('upMsg').innerHTML='No questions detected. Your PDF may use images or unusual formatting.<br><b>Tip:</b> PDFs should have text-based questions with options labeled A/B/C/D or (a)/(b)/(c)/(d).<br><br><button onclick="loadSample()" style="background:#00bcd4;color:#fff;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;">Try Sample Questions Instead</button>';
+            return;
+        }
+        setTimeout(()=>startTest(qs),300);
+    }catch(e){
+        $('upMsg').innerHTML='Error reading PDF: '+e.message+'<br><br><button onclick="loadSample()" style="background:#00bcd4;color:#fff;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;">Try Sample Questions Instead</button>';
+    }
 }
 </script>
 
