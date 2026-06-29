@@ -430,31 +430,70 @@ function strategy3_questions(lines) {
     let i = 0;
     while (i < cleaned.length) {
         const line = cleaned[i];
-        // Check if line contains a question (ends with ? or starts with number/Q)
-        if (line.includes('?') || /^\s*(?:Q\.?\s*\d+|\d+[.)]\s)/.test(line)) {
-            let qText = line.replace(/^\s*(?:Q\.?\s*\d+|\d+[.)]\s*)[.:)\s]*/, '').trim();
-            // Collect next lines as potential options
-            const opts = [];
+        // Check if line starts a question (has number prefix or contains ?)
+        if (/^\s*(?:Q\.?\s*\d+|\d+[.)]\s)/.test(line) || line.includes('?')) {
+            // Collect the full question text (may span multiple lines)
+            let qLines = [line];
             let j = i + 1;
-            while (j < cleaned.length && opts.length < 4) {
-                const optLine = cleaned[j].trim();
-                // Check if it's an option (starts with A/B/C/D or a/b/c/d or 1/2/3/4 or has (a) pattern)
-                const optMatch = optLine.match(/^[\s]*(?:\(?([A-Da-d1-4])\)?[.):\-\s]+)(.+)/);
-                if (optMatch) {
-                    opts.push(optMatch[2].trim());
-                } else if (optLine.length > 0 && optLine.length < 100 && opts.length < 4 && !optLine.includes('?')) {
-                    // Short line after question could be an option
-                    opts.push(optLine);
-                } else {
-                    break;
+            
+            // Keep adding lines to the question until we find option-like lines
+            while (j < cleaned.length) {
+                const nextLine = cleaned[j].trim();
+                if (!nextLine) { j++; continue; }
+                
+                // Check if this line starts an option group
+                const optGroup = findOptionGroup(cleaned.filter(l=>l!=='---PAGE_BREAK---'&&l.trim()), 
+                    cleaned.slice(0, j).filter(l=>l!=='---PAGE_BREAK---'&&l.trim()).length);
+                
+                // Simple check: does this line look like an option?
+                const isOption = (
+                    /^[\s]*(?:\(?[A-Da-d1-4]\)?[.):\-\s]+)/.test(nextLine) ||
+                    /^Rs\.?\s*\d/.test(nextLine) ||
+                    /^\$?\d+[\.,]?\d*\s*(cm|m|km|kg|%|years?)?$/.test(nextLine) ||
+                    /^\d+\s*(cm|m|km|kg|g|%|years?|days?|hrs?|min|sec)?\s*$/.test(nextLine)
+                );
+                
+                // If it's clearly an option, stop collecting question text
+                if (isOption) break;
+                
+                // If line is short and next lines are similar (forming options), stop
+                if (nextLine.length < 40 && j + 1 < cleaned.length) {
+                    const afterNext = cleaned[j + 1] ? cleaned[j + 1].trim() : '';
+                    if (afterNext && Math.abs(nextLine.length - afterNext.length) < 15 && 
+                        nextLine.length < 40 && afterNext.length < 40 &&
+                        nextLine.substring(0, 2) === afterNext.substring(0, 2)) {
+                        break; // These look like options starting
+                    }
                 }
+                
+                // Otherwise it's part of the question
+                qLines.push(nextLine);
                 j++;
             }
-            if (opts.length >= 2) {
-                qs.push({ question: qText, options: opts.slice(0, 4), correctAnswer: 0, explanation: '' });
-                i = j;
-                continue;
+            
+            // Now collect options from position j
+            const opts = [];
+            while (j < cleaned.length && opts.length < 4) {
+                const optLine = cleaned[j].trim();
+                if (!optLine) { j++; continue; }
+                
+                // Check if we've hit the next question
+                if (/^\s*(?:Q\.?\s*\d+|\d+[.)]\s)/.test(optLine) && opts.length >= 2) break;
+                if (optLine.length > 80) break; // Too long to be an option
+                
+                const optText = optLine.replace(/^[\s]*(?:\(?[A-Da-d1-4]\)?[.):\-\s]+)/, '').trim() || optLine;
+                opts.push(optText);
+                j++;
             }
+            
+            if (opts.length >= 2) {
+                let qText = qLines.join(' ').replace(/^\s*(?:Q\.?\s*\d+|\d+[.)]\s*)[.:)\s]*/, '').trim();
+                if (qText.length >= 5) {
+                    qs.push({ question: qText, options: opts.slice(0, 4), correctAnswer: 0, explanation: '' });
+                }
+            }
+            i = j;
+            continue;
         }
         i++;
     }
@@ -465,50 +504,170 @@ function strategy4_aggressive(lines) {
     const qs = [];
     const cleaned = lines.filter(l => l !== '---PAGE_BREAK---' && l.trim().length > 0);
     
-    // Look for any line that could be a question (longer text) followed by shorter lines (options)
+    // Smart detection: group lines into questions by finding OPTION GROUPS
+    // Options are lines that share a common pattern (same prefix, similar length, similar format)
     let i = 0;
     while (i < cleaned.length - 2) {
-        const line = cleaned[i];
-        // A question candidate: longer than 20 chars, or contains ?, or starts with number
-        const isQCandidate = line.length > 25 || line.includes('?') || /^\d+[.)]\s/.test(line);
-        if (isQCandidate) {
-            // Look ahead for 2-4 shorter option-like lines
-            const opts = [];
-            let j = i + 1;
-            while (j < cleaned.length && j <= i + 6 && opts.length < 4) {
-                const nextLine = cleaned[j].trim();
-                const isOpt = nextLine.length < 80 && nextLine.length > 1 && (
-                    /^[\s]*(?:\(?[A-Da-d1-4]\)?[.):\-\s]+)/.test(nextLine) ||
-                    (nextLine.length < 50 && opts.length < 4)
-                );
-                if (isOpt) {
-                    opts.push(nextLine.replace(/^[\s]*(?:\(?[A-Da-d1-4]\)?[.):\-\s]+)/, '').trim() || nextLine);
-                } else break;
-                j++;
-            }
-            if (opts.length >= 2 && opts.length <= 4) {
-                const qText = line.replace(/^\s*(?:Q\.?\s*\d+|\d+[.)]\s*)[.:)\s]*/, '').trim();
-                if (qText.length >= 5) {
-                    qs.push({ question: qText, options: opts.slice(0, 4), correctAnswer: 0, explanation: '' });
-                    i = j;
-                    continue;
-                }
+        // Try to find a group of 2-5 consecutive lines that look like options
+        let optStart = -1;
+        let optEnd = -1;
+        
+        for (let j = i; j < cleaned.length - 1; j++) {
+            const group = findOptionGroup(cleaned, j);
+            if (group.count >= 2) {
+                optStart = group.start;
+                optEnd = group.start + group.count;
+                break;
             }
         }
-        i++;
+        
+        if (optStart === -1) break; // No more option groups found
+        
+        // Everything from i to optStart is the question text
+        const qLines = cleaned.slice(i, optStart);
+        const qText = qLines.join(' ').replace(/^\s*(?:Q\.?\s*\d+|\d+[.)]\s*)[.:)\s]*/, '').trim();
+        const opts = cleaned.slice(optStart, optEnd).map(l => 
+            l.replace(/^[\s]*(?:\(?[A-Da-d1-4]\)?[.):\-\s]+)/, '').trim()
+        );
+        
+        if (qText.length >= 10 && opts.length >= 2) {
+            qs.push({ question: qText, options: opts.slice(0, 4), correctAnswer: 0, explanation: '' });
+        }
+        
+        i = optEnd;
     }
     return qs;
 }
 
+// Detect a group of consecutive lines that look like answer options
+function findOptionGroup(lines, startIdx) {
+    const result = { start: startIdx, count: 0 };
+    
+    // Check if lines starting at startIdx form an option group
+    // Options typically: same prefix (Rs., $, %, numbers), similar length, or have A/B/C/D labels
+    
+    const candidates = [];
+    for (let j = startIdx; j < Math.min(startIdx + 6, lines.length); j++) {
+        const line = lines[j].trim();
+        if (line.length === 0) break;
+        
+        // Strong option indicators
+        const hasLabel = /^[\s]*(?:\(?[A-Da-d1-4]\)?[.):\-\s]+)/.test(line);
+        // Common option patterns: starts with Rs., $, numbers, short text
+        const looksLikeOption = (
+            line.length < 60 &&
+            (/^Rs\.?\s*\d/.test(line) ||      // Rs. 52
+            /^\$?\d+[\.,]?\d*/.test(line) ||   // $52 or 52
+            /^\d+\s*(cm|m|km|kg|g|%|years?|days?|hrs?|min)/.test(line) ||  // 52 cm, 5 years
+            /^(None|All|Both|Neither|True|False|Yes|No|Cannot)/i.test(line) ||
+            hasLabel)
+        );
+        
+        if (looksLikeOption || hasLabel) {
+            candidates.push(line);
+        } else if (candidates.length >= 2) {
+            break; // We already have options, stop
+        } else {
+            // Check if it could still be an option: short line similar to previous
+            if (candidates.length > 0 && line.length < 50 && 
+                Math.abs(line.length - candidates[candidates.length-1].length) < 30) {
+                candidates.push(line);
+            } else {
+                break;
+            }
+        }
+    }
+    
+    // Also check: if 3+ consecutive lines have similar prefix pattern
+    if (candidates.length < 2) {
+        candidates.length = 0;
+        const prefixes = [];
+        for (let j = startIdx; j < Math.min(startIdx + 5, lines.length); j++) {
+            const line = lines[j].trim();
+            if (line.length < 50 && line.length > 0) {
+                const prefix = line.substring(0, Math.min(3, line.length));
+                prefixes.push({ line, prefix, idx: j });
+            } else break;
+        }
+        // Check if multiple lines share same prefix
+        if (prefixes.length >= 3) {
+            const p0 = prefixes[0].prefix;
+            const matching = prefixes.filter(p => p.prefix === p0 || 
+                (p.line.length < 40 && Math.abs(p.line.length - prefixes[0].line.length) < 20));
+            if (matching.length >= 3) {
+                result.start = matching[0].idx;
+                result.count = matching.length;
+                return result;
+            }
+        }
+    }
+    
+    result.count = candidates.length;
+    return result;
+}
+
 function strategy5_lines(lines) {
-    // Last resort: treat every 5 non-empty lines as question + 4 options
+    // Smarter fallback: find question boundaries by looking for numbered starts
     const qs = [];
-    const cleaned = lines.filter(l => l !== '---PAGE_BREAK---' && l.trim().length > 1);
-    for (let i = 0; i + 4 < cleaned.length; i += 5) {
-        const q = cleaned[i].replace(/^\s*(?:Q\.?\s*\d+|\d+[.)]\s*)[.:)\s]*/, '').trim();
-        const opts = cleaned.slice(i + 1, i + 5).map(l => l.replace(/^[\s]*(?:\(?[A-Da-d1-4]\)?[.):\-\s]+)/, '').trim());
-        if (q.length >= 5 && opts.filter(o => o.length > 0).length >= 2) {
-            qs.push({ question: q, options: opts, correctAnswer: 0, explanation: '' });
+    const cleaned = lines.filter(l => l !== '---PAGE_BREAK---' && l.trim().length > 0);
+    
+    // Find lines that start new questions (numbered or after a blank-like gap)
+    const qStarts = [];
+    for (let i = 0; i < cleaned.length; i++) {
+        const line = cleaned[i].trim();
+        if (/^\s*(?:Q\.?\s*)?(\d+)\s*[.):\-]\s/.test(line) || 
+            /^\s*\d+\s*$/.test(cleaned[i-1]||'')) { // Previous line was just a number
+            qStarts.push(i);
+        }
+    }
+    
+    // If we found question starts, process between them
+    if (qStarts.length >= 2) {
+        for (let qi = 0; qi < qStarts.length; qi++) {
+            const start = qStarts[qi];
+            const end = qi < qStarts.length - 1 ? qStarts[qi + 1] : cleaned.length;
+            const blockLines = cleaned.slice(start, end);
+            
+            // Find where options begin in this block
+            const optGroup = findOptionGroup(blockLines, 1); // Skip first line (question start)
+            if (optGroup.count >= 2) {
+                const qText = blockLines.slice(0, optGroup.start).join(' ')
+                    .replace(/^\s*(?:Q\.?\s*\d+|\d+[.)]\s*)[.:)\s]*/, '').trim();
+                const opts = blockLines.slice(optGroup.start, optGroup.start + optGroup.count)
+                    .map(l => l.replace(/^[\s]*(?:\(?[A-Da-d1-4]\)?[.):\-\s]+)/, '').trim());
+                if (qText.length >= 5 && opts.length >= 2) {
+                    qs.push({ question: qText, options: opts.slice(0, 4), correctAnswer: 0, explanation: '' });
+                }
+            }
+        }
+        return qs;
+    }
+    
+    // True last resort: look for any group of short similar lines (options)
+    // and take everything above them as the question
+    let idx = 0;
+    while (idx < cleaned.length - 2) {
+        const optGrp = findOptionGroup(cleaned, idx);
+        if (optGrp.count >= 2 && optGrp.start > 0) {
+            // Look backwards for question text (up to 5 lines before)
+            const qStart = Math.max(0, optGrp.start - 5);
+            // Find actual question start (skip previous options)
+            let actualQStart = optGrp.start - 1;
+            while (actualQStart > qStart) {
+                const prevLine = cleaned[actualQStart - 1];
+                if (prevLine && prevLine.length > 15) actualQStart--;
+                else break;
+            }
+            const qText = cleaned.slice(actualQStart, optGrp.start).join(' ')
+                .replace(/^\s*(?:Q\.?\s*\d+|\d+[.)]\s*)[.:)\s]*/, '').trim();
+            const opts = cleaned.slice(optGrp.start, optGrp.start + optGrp.count)
+                .map(l => l.replace(/^[\s]*(?:\(?[A-Da-d1-4]\)?[.):\-\s]+)/, '').trim());
+            if (qText.length >= 5) {
+                qs.push({ question: qText, options: opts.slice(0, 4), correctAnswer: 0, explanation: '' });
+            }
+            idx = optGrp.start + optGrp.count;
+        } else {
+            idx++;
         }
     }
     return qs;
