@@ -133,6 +133,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 </div>
 <div class="tb-palette-stats" id="paletteStats">
 <span class="ps-item correct"><b id="psCorrect">0</b> Correct</span>
+<span class="ps-item attempted-stat"><b id="psAttempted">0</b> Attempted</span>
 <span class="ps-item unattempted"><b id="psUnattempted">0</b> Unattempted</span>
 <span class="ps-item incorrect"><b id="psIncorrect">0</b> Incorrect</span>
 </div>
@@ -279,6 +280,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .tb-palette-stats{display:flex;gap:8px;padding:10px 16px;border-bottom:1px solid #eee;flex-wrap:wrap;}
 .ps-item{font-size:11px;padding:3px 8px;border-radius:4px;border:1px solid #ddd;display:flex;align-items:center;gap:4px;}
 .ps-item.correct b{color:#4caf50;}.ps-item.correct{border-color:#4caf50;}
+.ps-item.attempted-stat b{color:#1976d2;}.ps-item.attempted-stat{border-color:#1976d2;}
 .ps-item.unattempted b{color:#666;}.ps-item.unattempted{border-color:#999;}
 .ps-item.incorrect b{color:#f44336;}.ps-item.incorrect{border-color:#f44336;}
 .tb-section-label{padding:10px 16px;font-size:12px;font-weight:700;color:#00838f;background:#e0f2f1;border-bottom:1px solid #eee;}
@@ -287,6 +289,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .pal-btn:hover{transform:scale(1.1);}
 .pal-btn.current{border-color:#1a237e;background:#1a237e;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.3);}
 .pal-btn.answered{border-color:#4caf50;background:#4caf50;color:#fff;}
+.pal-btn.attempted{border-color:#1976d2;background:#1976d2;color:#fff;}
 .pal-btn.wrong-a{border-color:#f44336;background:#f44336;color:#fff;}
 .pal-btn.not-visited{border-color:#ddd;background:#fff;color:#666;}
 .pal-btn.marked{border-color:#9c27b0;background:#9c27b0;color:#fff;}
@@ -823,7 +826,7 @@ function categorize(qs) {
         q.category = best;
         if (!q.explanation) q.explanation = q.hasKey 
             ? `The correct answer is "${q.options[q.correctAnswer]}".`
-            : `Solve step by step: Read the question carefully, identify given values, apply the formula, and match your answer with the options: ${q.options.join(', ')}.`;
+            : `No answer key available. Enter a Gemini API key for AI-powered solutions.`;
         return q;
     });
 }
@@ -903,22 +906,21 @@ function buildPalette(){
 }
 function updatePalette(){
     const btns=$('palette').querySelectorAll('.pal-btn');
-    let cor=0,inc=0,una=0;
     btns.forEach((b,i)=>{
         b.className='pal-btn';const a=S.answers[i];
         if(i===S.idx)b.classList.add('current');
         else if(a.status==='correct'){b.classList.add('answered');}
         else if(a.status==='wrong'){b.classList.add('wrong-a');}
-        else if(a.status==='answered'){b.classList.add('answered');} // No key - show as answered (green)
+        else if(a.status==='answered'){b.classList.add('attempted');} // No key - show as blue (attempted)
         else if(a.status==='marked')b.classList.add('marked');
         else b.classList.add('not-visited');
-        if(a.status==='correct')cor++;if(a.status==='wrong')inc++;
     });
-    // Fix counts
-    cor=S.answers.filter(a=>a.status==='correct'||a.status==='answered').length;
-    inc=S.answers.filter(a=>a.status==='wrong').length;
-    una=S.answers.filter(a=>a.status==='not-visited'||a.status==='unanswered').length;
-    $('psCorrect').textContent=cor;$('psIncorrect').textContent=inc;$('psUnattempted').textContent=una;
+    // Counts - separate correct (verified) from attempted (no key)
+    const cor=S.answers.filter(a=>a.status==='correct').length;
+    const att=S.answers.filter(a=>a.status==='answered').length;
+    const inc=S.answers.filter(a=>a.status==='wrong').length;
+    const una=S.answers.filter(a=>a.status==='not-visited'||a.status==='unanswered').length;
+    $('psCorrect').textContent=cor;$('psAttempted').textContent=att;$('psIncorrect').textContent=inc;$('psUnattempted').textContent=una;
 }
 
 // ===== LOAD QUESTION =====
@@ -1018,26 +1020,29 @@ function finishTest(){
 }
 function renderResults(){
     const tot=S.questions.length;
-    const cor=S.answers.filter(a=>a.status==='correct'||a.status==='answered').length;
+    const cor=S.answers.filter(a=>a.status==='correct').length;
+    const att=S.answers.filter(a=>a.status==='answered').length;
     const wrn=S.answers.filter(a=>a.status==='wrong').length;
-    const skp=tot-cor-wrn;
-    const ans=S.answers.filter(a=>a.status==='correct'||a.status==='wrong');
+    const skp=tot-cor-att-wrn;
+    const ans=S.answers.filter(a=>a.status==='correct'||a.status==='wrong'||a.status==='answered');
     const ttime=ans.reduce((s,a)=>s+a.time,0);
     const avg=ans.length?Math.round(ttime/ans.length):0;
-    const pct=Math.round((cor/tot)*100);
-    const acc=ans.length?Math.round((cor/ans.length)*100):0;
+    const score=cor+att; // score includes attempted (no key) since we can't verify
+    const pct=Math.round((score/tot)*100);
+    const acc=ans.length?Math.round((cor/(cor+wrn||1))*100):0;
     $('resTestName').textContent='Practice Test';
     // Summary cards
     $('resSummaryCards').innerHTML=`
-        <div class="res-s-card"><div class="res-s-icon score">🏆</div><div><div class="res-s-val">${cor*1}<span class="res-s-total"> / ${tot}</span></div><div class="res-s-label">Score</div></div></div>
-        <div class="res-s-card"><div class="res-s-icon attempted">📝</div><div><div class="res-s-val">${cor+wrn}<span class="res-s-total"> / ${tot}</span></div><div class="res-s-label">Attempted</div></div></div>
+        <div class="res-s-card"><div class="res-s-icon score">🏆</div><div><div class="res-s-val">${cor}<span class="res-s-total"> / ${tot}</span></div><div class="res-s-label">Correct</div></div></div>
+        <div class="res-s-card"><div class="res-s-icon attempted">📝</div><div><div class="res-s-val">${cor+att+wrn}<span class="res-s-total"> / ${tot}</span></div><div class="res-s-label">Attempted</div></div></div>
         <div class="res-s-card"><div class="res-s-icon accuracy">🎯</div><div><div class="res-s-val">${acc}%</div><div class="res-s-label">Accuracy</div></div></div>
         <div class="res-s-card"><div class="res-s-icon rank">⏱</div><div><div class="res-s-val">${avg}s</div><div class="res-s-label">Avg Time/Q</div></div></div>
         <div class="res-s-card"><div class="res-s-icon percentile">📊</div><div><div class="res-s-val">${pct}%</div><div class="res-s-label">Score %</div></div></div>`;
     // Sectional
     const cats={};S.questions.forEach((q,i)=>{const c=q.category||'General';if(!cats[c])cats[c]={total:0,correct:0,time:0,attempted:0};cats[c].total++;
     if(S.answers[i].status==='correct'){cats[c].correct++;cats[c].attempted++;cats[c].time+=S.answers[i].time;}
-    else if(S.answers[i].status==='wrong'){cats[c].attempted++;cats[c].time+=S.answers[i].time;}});
+    else if(S.answers[i].status==='wrong'){cats[c].attempted++;cats[c].time+=S.answers[i].time;}
+    else if(S.answers[i].status==='answered'){cats[c].attempted++;cats[c].time+=S.answers[i].time;}});
     let tbody='';for(const[name,d]of Object.entries(cats)){
         const a=d.attempted?Math.round((d.correct/d.attempted)*100):0;
         const acl=a>=70?'high':a>=40?'mid':'low';
@@ -1048,10 +1053,10 @@ function renderResults(){
     const keys=['A','B','C','D'];let dt='';
     S.questions.forEach((q,i)=>{const a=S.answers[i];
         const yours=a.selected>=0?keys[a.selected]+'. '+q.options[a.selected]:'—';
-        const corr=keys[q.correctAnswer]+'. '+q.options[q.correctAnswer];
+        const corr=q.hasKey?keys[q.correctAnswer]+'. '+q.options[q.correctAnswer]:'No key';
         let st='';if(a.status==='correct')st='<span class="status-dot c">✓ Correct</span>';
         else if(a.status==='wrong')st='<span class="status-dot w">✗ Wrong</span>';
-        else if(a.status==='answered')st='<span class="status-dot c">✓ Attempted</span>';
+        else if(a.status==='answered')st='<span class="status-dot s">● Attempted</span>';
         else st='<span class="status-dot s">— Skipped</span>';
         dt+=`<tr><td>${i+1}</td><td>${q.question.substring(0,55)}${q.question.length>55?'...':''}</td><td>${yours}</td><td>${corr}</td><td>${fmt(a.time)}</td><td>${st}</td></tr>`;
     });
