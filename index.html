@@ -372,7 +372,9 @@ function parseFormat_Qn(text) {
     
     for (const block of blocks) {
         if (!block.trim()) continue;
-        const q = extractQFromBlock(block);
+        // Remove phone numbers/watermarks
+        const cleaned = block.replace(/\b\d{10,}\b/g, '').replace(/\b\d{7,}\b/g, '').trim();
+        const q = extractQFromBlock(cleaned);
         if (q) qs.push(q);
     }
     return qs;
@@ -464,6 +466,8 @@ function parseFormat_Fallback(text) {
 
 // Extract question and options from a text block
 function extractQFromBlock(block) {
+    // Remove phone numbers, watermarks, long digit strings
+    block = block.replace(/\b\d{10,}\b/g, '').replace(/\b\d{7,}\b/g, '').trim();
     // Find options: (A) text (B) text (C) text (D) text
     const optPatterns = [
         /\(([A-E])\)\s*([^\n(]+)/gi,    // (A) text
@@ -593,6 +597,52 @@ function autoSolve(qs) {
             }
         }
         
+        // COMPLEX: marked price, discount, profit % combined
+        else if (text.includes('marked price') && text.includes('profit') && numbers.length >= 2) {
+            // Try: shopkeeper cuts X from MP, MP is Y more than CP, profit Z%
+            const cutMatch = q.question.match(/cut\s*(?:Rs\.?\s*)?(\d[\d,]*)/i);
+            const mpMoreMatch = q.question.match(/marked\s*price\s*(?:was|is)?\s*(?:Rs\.?\s*)?(\d[\d,]*)\s*more\s*than/i);
+            const profitPctMatch = q.question.match(/profit\s*(?:of)?\s*(\d+)\s*%/i);
+            
+            if (cutMatch && mpMoreMatch && profitPctMatch) {
+                const discount = parseFloat(cutMatch[1].replace(/,/g, ''));
+                const mpAboveCp = parseFloat(mpMoreMatch[1].replace(/,/g, ''));
+                const profitPct = parseFloat(profitPctMatch[1]);
+                // SP = MP - discount, MP = CP + mpAboveCp
+                // profit% = (SP - CP)/CP * 100
+                // profitPct/100 = (MP - discount - CP) / CP
+                // CP + mpAboveCp = MP, so MP = CP + mpAboveCp
+                // SP = CP + mpAboveCp - discount
+                // profitPct/100 = (mpAboveCp - discount) / CP
+                // CP = (mpAboveCp - discount) * 100 / profitPct
+                const cp = (mpAboveCp - discount) * 100 / profitPct;
+                answer = cp + mpAboveCp - discount; // SP = MP - discount = CP + mpAboveCp - discount
+            }
+            // Try: marked price is X, discount Y%, find SP
+            else if (!cutMatch) {
+                const mpMatch = q.question.match(/marked\s*price\s*(?:of|is|=|:)?\s*(?:Rs\.?\s*)?(\d[\d,]*)/i);
+                const discPctMatch = q.question.match(/discount\s*(?:of)?\s*(\d+)\s*%/i);
+                if (mpMatch && discPctMatch) {
+                    const mp = parseFloat(mpMatch[1].replace(/,/g, ''));
+                    const discPct = parseFloat(discPctMatch[1]);
+                    answer = mp * (1 - discPct/100);
+                }
+            }
+        }
+        
+        // SIMPLE INTEREST: P*R*T/100
+        else if (text.includes('interest') && text.includes('rate')) {
+            const pMatch = q.question.match(/(?:principal|sum|amount)\s*(?:of|is|=)?\s*(?:Rs\.?\s*)?(\d[\d,]*)/i);
+            const rMatch = q.question.match(/(?:rate)\s*(?:of|is|=)?\s*(\d+)\s*%/i);
+            const tMatch = q.question.match(/(\d+)\s*(?:years?|yrs?)/i);
+            if (pMatch && rMatch && tMatch) {
+                const p = parseFloat(pMatch[1].replace(/,/g, ''));
+                const r = parseFloat(rMatch[1]);
+                const t = parseFloat(tMatch[1]);
+                answer = (p * r * t) / 100;
+            }
+        }
+        
         // SIMPLE: if question has exactly 2 numbers and asks for difference/sum
         else if (numbers.length === 2 && (text.includes('find') || text.includes('what is') || text.includes('calculate'))) {
             if (text.includes('difference') || text.includes('how much more') || text.includes('how much less')) {
@@ -649,7 +699,7 @@ function categorize(qs) {
         q.category = best;
         if (!q.explanation) q.explanation = q.hasKey 
             ? `The correct answer is "${q.options[q.correctAnswer]}".`
-            : `This question was extracted from your PDF without an answer key. Work through the problem to verify your answer. The options provided are: ${q.options.join(', ')}.`;
+            : `Solve step by step: Read the question carefully, identify given values, apply the formula, and match your answer with the options: ${q.options.join(', ')}.`;
         return q;
     });
 }
