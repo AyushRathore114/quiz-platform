@@ -316,7 +316,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 
 
 <script>
-// ===== PDF PARSER (Improved - handles many formats) =====
+// ===== PDF PARSER - Rebuilt for Q1:/Q2: format with (A)(B)(C)(D)(E) options =====
 if(typeof pdfjsLib!=='undefined')pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 async function parsePDF(file, cb) {
@@ -324,405 +324,190 @@ async function parsePDF(file, cb) {
     const ab = await file.arrayBuffer();
     cb(20, 'Loading document...');
     const pdf = await pdfjsLib.getDocument({data: ab}).promise;
-    let lines = [];
+    let allText = '';
 
     for (let i = 1; i <= pdf.numPages; i++) {
-        cb(20 + (i / pdf.numPages) * 45, `Extracting page ${i}/${pdf.numPages}...`);
+        cb(20 + (i / pdf.numPages) * 50, `Extracting page ${i}/${pdf.numPages}...`);
         const page = await pdf.getPage(i);
         const tc = await page.getTextContent();
-        // Get text items with Y positions to detect line breaks
+        // Build text with proper spacing using Y-positions
         let lastY = null;
-        let currentLine = '';
         for (const item of tc.items) {
             const y = Math.round(item.transform[5]);
-            if (lastY !== null && Math.abs(y - lastY) > 5) {
-                if (currentLine.trim()) lines.push(currentLine.trim());
-                currentLine = '';
+            if (lastY !== null && Math.abs(y - lastY) > 3) {
+                allText += '\n';
             }
-            currentLine += item.str + ' ';
+            allText += item.str;
             lastY = y;
         }
-        if (currentLine.trim()) lines.push(currentLine.trim());
-        lines.push('---PAGE_BREAK---');
+        allText += '\n\n';
     }
 
-    cb(70, 'Detecting questions...');
-    const rawText = lines.join('\n');
-    let qs = [];
-
-    // Strategy 1: Look for numbered questions with lettered options
-    qs = strategy1_numbered(lines);
-    if (qs.length >= 2) { cb(90, `Found ${qs.length} questions!`); return categorize(qs); }
-
-    // Strategy 2: Look for option patterns (a) (b) (c) (d) or A. B. C. D.
-    qs = strategy2_options(rawText);
-    if (qs.length >= 2) { cb(90, `Found ${qs.length} questions!`); return categorize(qs); }
-
-    // Strategy 3: Questions ending with ? followed by lines
-    qs = strategy3_questions(lines);
-    if (qs.length >= 2) { cb(90, `Found ${qs.length} questions!`); return categorize(qs); }
-
-    // Strategy 4: Aggressive - split by any numbering and look for 4 short items after
-    qs = strategy4_aggressive(lines);
-    if (qs.length >= 2) { cb(90, `Found ${qs.length} questions!`); return categorize(qs); }
-
-    // Strategy 5: Ultra fallback - split entire text into groups of 5 lines (1 question + 4 options)
-    qs = strategy5_lines(lines);
-    if (qs.length >= 1) { cb(90, `Found ${qs.length} questions (basic mode)!`); return categorize(qs); }
-
-    cb(100, 'No questions found');
-    return [];
+    cb(75, 'Parsing questions...');
+    
+    // Try parsing strategies in order of specificity
+    let qs = parseFormat_Qn(allText);          // Q1: ... (A) (B) (C) (D)
+    if (!qs.length) qs = parseFormat_Numbered(allText);  // 1. ... (A) (B) (C) (D)  
+    if (!qs.length) qs = parseFormat_Options(allText);   // Any text + (A)(B)(C)(D) pattern
+    if (!qs.length) qs = parseFormat_Fallback(allText);  // Line-based fallback
+    
+    cb(95, qs.length ? `Found ${qs.length} questions!` : 'No questions found');
+    return categorize(qs);
 }
 
-function strategy1_numbered(lines) {
+// Format 1: Q1: question text \n (A) opt (B) opt (C) opt (D) opt
+function parseFormat_Qn(text) {
     const qs = [];
-    const text = lines.filter(l => l !== '---PAGE_BREAK---').join('\n');
-    // Split by question numbers: "1." "2." "Q1" "Q.1" "1)" etc.
-    const parts = text.split(/\n\s*(?:Q(?:uestion)?[\s.]*)?(\d+)\s*[.):\-]\s*/i);
+    // Split by Q followed by number and colon/dot/dash
+    const blocks = text.split(/(?=Q\s*\d+\s*[:.)\-]\s*)/i);
     
-    for (let i = 1; i < parts.length; i += 2) {
-        const block = (parts[i + 1] || '').trim();
-        if (!block) continue;
-        const parsed = parseBlock(block);
-        if (parsed) qs.push(parsed);
+    for (const block of blocks) {
+        if (!block.trim()) continue;
+        const q = extractQFromBlock(block);
+        if (q) qs.push(q);
     }
     return qs;
 }
 
-function strategy2_options(text) {
+// Format 2: 1. question text OR 1) question text
+function parseFormat_Numbered(text) {
     const qs = [];
-    // Find blocks that have (a)...(b)...(c)...(d) or (A)...(B)...(C)...(D) or a)...b)...
-    const optionSets = text.split(/(?=(?:\n|^)\s*(?:\d+[.)]\s*|Q\d+[.:)\s]))/gi);
+    // Split by line-starting numbers
+    const blocks = text.split(/(?=(?:^|\n)\s*\d+\s*[.):\-]\s*[A-Z])/m);
     
-    for (const block of optionSets) {
-        const parsed = parseBlock(block);
-        if (parsed) qs.push(parsed);
-    }
-    
-    if (qs.length >= 2) return qs;
-    
-    // Try splitting by lines that look like options
-    const allOptions = [...text.matchAll(/(?:^|\n)\s*\(?([A-Da-d1-4])\)?[.):\s]+(.+?)(?=(?:\n\s*\(?[A-Da-d1-4]\)?[.):\s])|(?:\n\s*(?:Q|\d+[.)]))|$)/gs)];
-    if (allOptions.length >= 4) {
-        // Group every 4 options
-        for (let i = 0; i < allOptions.length - 3; i += 4) {
-            const optGroup = allOptions.slice(i, i + 4);
-            // The question is whatever is between previous group and this one
-            const startIdx = i > 0 ? allOptions[i-1].index + allOptions[i-1][0].length : 0;
-            const endIdx = optGroup[0].index;
-            const qText = text.substring(startIdx, endIdx).trim().replace(/^\d+[.):\s]+/, '').replace(/^Q\d+[.):\s]+/i, '').trim();
-            if (qText.length > 5) {
-                qs.push({
-                    question: qText.split('\n').filter(l=>l.trim()).join(' '),
-                    options: optGroup.map(m => m[2].trim()),
-                    correctAnswer: 0,
-                    explanation: ''
-                });
-            }
-        }
+    for (const block of blocks) {
+        if (!block.trim() || block.trim().length < 20) continue;
+        const q = extractQFromBlock(block);
+        if (q) qs.push(q);
     }
     return qs;
 }
 
-function strategy3_questions(lines) {
+// Format 3: Find (A)...(B)...(C)...(D) patterns and take text above as question
+function parseFormat_Options(text) {
     const qs = [];
-    const cleaned = lines.filter(l => l !== '---PAGE_BREAK---');
-    let i = 0;
-    while (i < cleaned.length) {
-        const line = cleaned[i];
-        // Check if line starts a question (has number prefix or contains ?)
-        if (/^\s*(?:Q\.?\s*\d+|\d+[.)]\s)/.test(line) || line.includes('?')) {
-            // Collect the full question text (may span multiple lines)
-            let qLines = [line];
-            let j = i + 1;
-            
-            // Keep adding lines to the question until we find option-like lines
-            while (j < cleaned.length) {
-                const nextLine = cleaned[j].trim();
-                if (!nextLine) { j++; continue; }
-                
-                // Check if this line starts an option group
-                const optGroup = findOptionGroup(cleaned.filter(l=>l!=='---PAGE_BREAK---'&&l.trim()), 
-                    cleaned.slice(0, j).filter(l=>l!=='---PAGE_BREAK---'&&l.trim()).length);
-                
-                // Simple check: does this line look like an option?
-                // Must be SHORT and match a specific option pattern
-                const isOption = (
-                    /^[\s]*(?:\(?[A-Da-d1-4]\)?[.):\-\s]+)/.test(nextLine) ||
-                    (nextLine.length < 20 && /^Rs\.?\s*\d/.test(nextLine)) ||
-                    (nextLine.length < 15 && /^\d+[\.,]?\d*\s*(cm|m|km|kg|%|years?)?\.?\s*$/.test(nextLine)) ||
-                    (nextLine.length < 15 && /^[\-\+]?\$?\d+[\.,]?\d*\s*$/.test(nextLine))
-                );
-                
-                // If it's clearly an option, stop collecting question text
-                if (isOption) break;
-                
-                // If line is short and next lines are similar (forming options), stop
-                // But ONLY if this line is VERY short (< 20 chars) - otherwise it's question text
-                if (nextLine.length < 20 && j + 1 < cleaned.length) {
-                    const afterNext = cleaned[j + 1] ? cleaned[j + 1].trim() : '';
-                    if (afterNext && afterNext.length < 20 &&
-                        Math.abs(nextLine.length - afterNext.length) < 10 &&
-                        nextLine.substring(0, 3) === afterNext.substring(0, 3)) {
-                        break; // These look like options starting
-                    }
-                }
-                
-                // Otherwise it's part of the question
-                qLines.push(nextLine);
-                j++;
-            }
-            
-            // Now collect options from position j
-            const opts = [];
-            while (j < cleaned.length && opts.length < 4) {
-                const optLine = cleaned[j].trim();
-                if (!optLine) { j++; continue; }
-                
-                // Check if we've hit the next question
-                if (/^\s*(?:Q\.?\s*\d+|\d+[.)]\s)/.test(optLine) && opts.length >= 2) break;
-                if (optLine.length > 80) break; // Too long to be an option
-                
-                const optText = optLine.replace(/^[\s]*(?:\(?[A-Da-d1-4]\)?[.):\-\s]+)/, '').trim() || optLine;
-                opts.push(optText);
-                j++;
-            }
-            
-            if (opts.length >= 2) {
-                let qText = qLines.join(' ').replace(/^\s*(?:Q\.?\s*\d+|\d+[.)]\s*)[.:)\s]*/, '').trim();
-                if (qText.length >= 5) {
-                    qs.push({ question: qText, options: opts.slice(0, 4), correctAnswer: 0, explanation: '' });
-                }
-            }
-            i = j;
-            continue;
-        }
-        i++;
-    }
-    return qs;
-}
-
-function strategy4_aggressive(lines) {
-    const qs = [];
-    const cleaned = lines.filter(l => l !== '---PAGE_BREAK---' && l.trim().length > 0);
+    // Find all (A) option groups
+    const optionGroupRegex = /\(A\)\s*(.+?)(?:\n|\s{2,})\(B\)\s*(.+?)(?:\n|\s{2,})\(C\)\s*(.+?)(?:\n|\s{2,})\(D\)\s*(.+?)(?:(?:\n|\s{2,})\(E\)\s*(.+?))?(?=\n\s*(?:Q\s*\d|$|\n\n))/gi;
+    let match;
+    let lastEnd = 0;
     
-    // Smart detection: group lines into questions by finding OPTION GROUPS
-    // Options are lines that share a common pattern (same prefix, similar length, similar format)
-    let i = 0;
-    while (i < cleaned.length - 2) {
-        // Try to find a group of 2-5 consecutive lines that look like options
-        let optStart = -1;
-        let optEnd = -1;
+    while ((match = optionGroupRegex.exec(text)) !== null) {
+        const optStart = match.index;
+        // Question is everything between last question's end and this option group
+        let qText = text.substring(lastEnd, optStart).trim();
+        // Remove question number prefix
+        qText = qText.replace(/^Q\s*\d+\s*[:.)\-]\s*/i, '').replace(/^\d+\s*[.):\-]\s*/, '').trim();
+        // Remove Hindi line (line with Devanagari characters)
+        qText = qText.split('\n').filter(l => !/[\u0900-\u097F]/.test(l) && l.trim()).join(' ').trim();
         
-        for (let j = i; j < cleaned.length - 1; j++) {
-            const group = findOptionGroup(cleaned, j);
-            if (group.count >= 2) {
-                optStart = group.start;
-                optEnd = group.start + group.count;
+        if (qText.length >= 5) {
+            const opts = [match[1].trim(), match[2].trim(), match[3].trim(), match[4].trim()];
+            if (match[5]) opts.push(match[5].trim());
+            qs.push({ question: qText, options: opts.slice(0, 4), correctAnswer: 0, explanation: '' });
+        }
+        lastEnd = match.index + match[0].length;
+    }
+    return qs;
+}
+
+// Fallback: line-based detection
+function parseFormat_Fallback(text) {
+    const qs = [];
+    const lines = text.split('\n').filter(l => l.trim());
+    let i = 0;
+    
+    while (i < lines.length) {
+        // Collect question lines until we hit option lines
+        let qLines = [];
+        let optLines = [];
+        
+        // Find lines that look like options: start with (A) or (a) or A) etc.
+        while (i < lines.length) {
+            const line = lines[i].trim();
+            if (/^\s*\([A-Ea-e]\)\s/.test(line) || /^\s*[A-E][.)]\s/.test(line)) {
+                // This is an option
+                optLines.push(line.replace(/^\s*\(?[A-Ea-e]\)?\s*[.):\-]?\s*/, '').trim());
+                i++;
+            } else if (optLines.length >= 2) {
+                break; // We have enough options, this is the next question
+            } else if (optLines.length === 0) {
+                // Skip Hindi lines and header numbers
+                if (!/[\u0900-\u097F]/.test(line) && line.length > 3 && !/^\d{5,}/.test(line)) {
+                    qLines.push(line);
+                }
+                i++;
+            } else {
                 break;
             }
         }
         
-        if (optStart === -1) break; // No more option groups found
-        
-        // Everything from i to optStart is the question text
-        const qLines = cleaned.slice(i, optStart);
-        const qText = qLines.join(' ').replace(/^\s*(?:Q\.?\s*\d+|\d+[.)]\s*)[.:)\s]*/, '').trim();
-        const opts = cleaned.slice(optStart, optEnd).map(l => 
-            l.replace(/^[\s]*(?:\(?[A-Da-d1-4]\)?[.):\-\s]+)/, '').trim()
-        );
-        
-        if (qText.length >= 10 && opts.length >= 2) {
-            qs.push({ question: qText, options: opts.slice(0, 4), correctAnswer: 0, explanation: '' });
-        }
-        
-        i = optEnd;
-    }
-    return qs;
-}
-
-// Detect a group of consecutive lines that look like answer options
-function findOptionGroup(lines, startIdx) {
-    const result = { start: -1, count: 0 };
-    
-    // Scan from startIdx looking for 2+ consecutive lines that are CLEARLY options
-    for (let i = startIdx; i < lines.length - 1; i++) {
-        const candidates = [];
-        
-        for (let j = i; j < Math.min(i + 6, lines.length); j++) {
-            const line = lines[j].trim();
-            if (!line) break;
-            
-            // Strong option: has A/B/C/D label
-            const hasLabel = /^\s*(?:\(?[A-Da-d]\)?[.):\-\s]+)/.test(line);
-            if (hasLabel) { candidates.push(line); continue; }
-            
-            // If we already have candidates, check if this line matches their pattern
-            if (candidates.length > 0) {
-                const avgLen = candidates.reduce((s, c) => s + c.length, 0) / candidates.length;
-                // Option lines should be similar length (within 2x) and SHORT
-                if (line.length <= Math.max(avgLen * 2.5, 25) && line.length < 50) {
-                    // Check if same prefix pattern as other candidates
-                    const firstPrefix = candidates[0].substring(0, 3);
-                    const thisPrefix = line.substring(0, 3);
-                    if (thisPrefix === firstPrefix || line.length < 20) {
-                        candidates.push(line);
-                        continue;
-                    }
-                }
-                break; // Doesn't match pattern, stop
-            }
-            
-            // First candidate - must look like an option (short, specific format)
-            if (line.length < 25 && (
-                /^Rs\.?\s*\d/.test(line) ||
-                /^\d+[\.,]?\d*\s*(cm|m|km|kg|g|%|years?|days?|hrs?|min|sec|litres?|Rs\.?)?\.?\s*$/.test(line) ||
-                /^(None|All|Both|Neither|True|False|Yes|No|Cannot)/i.test(line) ||
-                /^[\-\+]?\$?\d+[\.,]?\d*\s*$/.test(line)
-            )) {
-                candidates.push(line);
-                continue;
-            }
-            
-            // Skip lines that are too long or look like sentences (have verbs, periods mid-sentence)
-            if (line.length > 35 || (line.includes('.') && line.indexOf('.') < line.length - 3)) {
-                // This is likely a sentence, not an option — skip it
-                if (candidates.length >= 2) break;
-                continue;
-            }
-        }
-        
-        if (candidates.length >= 2) {
-            result.start = i;
-            result.count = candidates.length;
-            return result;
-        }
-    }
-    
-    return result;
-}
-
-function strategy5_lines(lines) {
-    // Smarter fallback: find question boundaries by looking for numbered starts
-    const qs = [];
-    const cleaned = lines.filter(l => l !== '---PAGE_BREAK---' && l.trim().length > 0);
-    
-    // Find lines that start new questions (numbered or after a blank-like gap)
-    const qStarts = [];
-    for (let i = 0; i < cleaned.length; i++) {
-        const line = cleaned[i].trim();
-        if (/^\s*(?:Q\.?\s*)?(\d+)\s*[.):\-]\s/.test(line) || 
-            /^\s*\d+\s*$/.test(cleaned[i-1]||'')) { // Previous line was just a number
-            qStarts.push(i);
-        }
-    }
-    
-    // If we found question starts, process between them
-    if (qStarts.length >= 2) {
-        for (let qi = 0; qi < qStarts.length; qi++) {
-            const start = qStarts[qi];
-            const end = qi < qStarts.length - 1 ? qStarts[qi + 1] : cleaned.length;
-            const blockLines = cleaned.slice(start, end);
-            
-            // Find where options begin in this block
-            const optGroup = findOptionGroup(blockLines, 1); // Skip first line (question start)
-            if (optGroup.count >= 2) {
-                const qText = blockLines.slice(0, optGroup.start).join(' ')
-                    .replace(/^\s*(?:Q\.?\s*\d+|\d+[.)]\s*)[.:)\s]*/, '').trim();
-                const opts = blockLines.slice(optGroup.start, optGroup.start + optGroup.count)
-                    .map(l => l.replace(/^[\s]*(?:\(?[A-Da-d1-4]\)?[.):\-\s]+)/, '').trim());
-                if (qText.length >= 5 && opts.length >= 2) {
-                    qs.push({ question: qText, options: opts.slice(0, 4), correctAnswer: 0, explanation: '' });
-                }
-            }
-        }
-        return qs;
-    }
-    
-    // True last resort: look for any group of short similar lines (options)
-    // and take everything above them as the question
-    let idx = 0;
-    while (idx < cleaned.length - 2) {
-        const optGrp = findOptionGroup(cleaned, idx);
-        if (optGrp.count >= 2 && optGrp.start > 0) {
-            // Look backwards for question text (up to 5 lines before)
-            const qStart = Math.max(0, optGrp.start - 5);
-            // Find actual question start (skip previous options)
-            let actualQStart = optGrp.start - 1;
-            while (actualQStart > qStart) {
-                const prevLine = cleaned[actualQStart - 1];
-                if (prevLine && prevLine.length > 15) actualQStart--;
-                else break;
-            }
-            const qText = cleaned.slice(actualQStart, optGrp.start).join(' ')
-                .replace(/^\s*(?:Q\.?\s*\d+|\d+[.)]\s*)[.:)\s]*/, '').trim();
-            const opts = cleaned.slice(optGrp.start, optGrp.start + optGrp.count)
-                .map(l => l.replace(/^[\s]*(?:\(?[A-Da-d1-4]\)?[.):\-\s]+)/, '').trim());
+        if (qLines.length > 0 && optLines.length >= 2) {
+            let qText = qLines.join(' ').replace(/^Q\s*\d+\s*[:.)\-]\s*/i, '').replace(/^\d+\s*[.):\-]\s*/, '').trim();
             if (qText.length >= 5) {
-                qs.push({ question: qText, options: opts.slice(0, 4), correctAnswer: 0, explanation: '' });
+                qs.push({ question: qText, options: optLines.slice(0, 4), correctAnswer: 0, explanation: '' });
             }
-            idx = optGrp.start + optGrp.count;
         } else {
-            idx++;
+            i++;
         }
     }
     return qs;
 }
 
-function parseBlock(block) {
-    if (!block || block.trim().length < 10) return null;
-    // Try multiple option patterns
-    const patterns = [
-        /\(?([A-D])\)?[.):\-\s]+([^\n(]+)/gi,        // (A) or A) or A. or A-
-        /\(?([a-d])\)?[.):\-\s]+([^\n(]+)/gi,        // (a) or a) or a.
-        /([1-4])[.):\-\s]+([^\n]+)/gi,                // 1) or 1.
+// Extract question and options from a text block
+function extractQFromBlock(block) {
+    // Find options: (A) text (B) text (C) text (D) text
+    const optPatterns = [
+        /\(([A-E])\)\s*([^\n(]+)/gi,    // (A) text
+        /([A-E])\)\s*([^\n)]+)/gi,       // A) text
+        /([A-E])\.\s*([^\n.]+)/gi,       // A. text
     ];
     
     let options = [];
-    let firstOptIdx = -1;
+    let optStartIdx = -1;
     
-    for (const pat of patterns) {
+    for (const pat of optPatterns) {
         const matches = [...block.matchAll(pat)];
-        if (matches.length >= 2 && matches.length <= 5) {
+        if (matches.length >= 3) { // At least A, B, C
             options = matches.map(m => m[2].trim()).slice(0, 4);
-            firstOptIdx = block.indexOf(matches[0][0]);
+            optStartIdx = block.indexOf(matches[0][0]);
             break;
         }
     }
     
-    if (options.length < 2) return null;
+    if (options.length < 2 || optStartIdx === -1) return null;
     
-    let qText = block.substring(0, firstOptIdx).trim();
-    qText = qText.replace(/^\d+[.):\-\s]+/, '').replace(/^Q(?:uestion)?[\s.]*\d*[.):\s]*/i, '').trim();
+    // Question text = everything before options, minus Q-number prefix, minus Hindi
+    let qText = block.substring(0, optStartIdx);
+    qText = qText.replace(/^Q\s*\d+\s*[:.)\-]\s*/i, '').replace(/^\d+\s*[.):\-]\s*/, '').trim();
+    // Remove Hindi lines
+    qText = qText.split('\n').filter(l => !/[\u0900-\u097F]/.test(l) && l.trim().length > 0).join(' ').trim();
+    
     if (qText.length < 5) return null;
     
-    // Check for correct answer markers
+    // Try to find correct answer
     let ca = 0;
-    const ansPatterns = [/(?:answer|ans|correct|key)[:\s]*\(?([A-Da-d1-4])\)?/i, /\*([A-D])/i, /([A-D])\s*[✓✔★\*]/];
-    for (const ap of ansPatterns) {
-        const m = block.match(ap);
-        if (m) {
-            const v = m[1].toUpperCase();
-            if (v >= 'A' && v <= 'D') ca = v.charCodeAt(0) - 65;
-            else if (v >= '1' && v <= '4') ca = parseInt(v) - 1;
-            break;
-        }
+    const ansMatch = block.match(/(?:answer|ans|correct|key)[:\s]*\(?([A-Ea-e1-5])\)?/i);
+    if (ansMatch) {
+        const v = ansMatch[1].toUpperCase();
+        if (v >= 'A' && v <= 'E') ca = v.charCodeAt(0) - 65;
+        else if (v >= '1' && v <= '5') ca = parseInt(v) - 1;
     }
     
-    return { question: qText, options: options, correctAnswer: ca, explanation: '' };
+    return { question: qText, options: options.slice(0, 4), correctAnswer: Math.min(ca, options.length - 1), explanation: '' };
 }
 
 function categorize(qs) {
     const kw = {
-        Programming: ['code','function','variable','loop','array','class','algorithm','programming','python','javascript','java','compiler','syntax','pointer','recursion','stack','queue','linked','binary','tree','graph','oop','inheritance'],
-        Mathematics: ['calculate','equation','formula','algebra','geometry','probability','number','sum','prime','triangle','circle','angle','ratio','percentage','profit','loss','interest','speed','distance','time','average'],
-        Science: ['atom','molecule','cell','energy','force','gravity','physics','chemistry','biology','planet','light','speed','electron','neutron','acid','base','element','periodic','newton','mass','velocity'],
-        Geography: ['country','capital','continent','ocean','river','mountain','climate','largest','earth','population','state','district','lake','desert','island','forest'],
-        Technology: ['computer','internet','network','database','HTML','CSS','HTTP','SQL','server','cloud','RAM','CPU','operating','system','software','hardware','protocol','byte','pixel'],
-        History: ['war','battle','empire','king','queen','dynasty','independence','revolution','treaty','century','ancient','mughal','british','freedom','movement','constitution'],
-        'Reasoning': ['series','pattern','analogy','odd','mirror','direction','blood','relation','coding','decoding','arrangement','syllogism','puzzle','rank','position','sequence'],
-        'English': ['synonym','antonym','grammar','sentence','error','spelling','idiom','phrase','vocabulary','passage','comprehension','meaning','word','verb','noun','tense'],
-        'Current Affairs': ['minister','president','award','scheme','launched','appointed','committee','gdp','budget','policy','summit','agreement']
+        'Profit & Loss': ['profit','loss','cost price','selling price','bought','sold','cp','sp','discount','marked price'],
+        Programming: ['code','function','variable','loop','array','class','algorithm','python','javascript'],
+        Mathematics: ['calculate','equation','formula','algebra','geometry','probability','ratio','percentage','interest','average','speed','distance','time'],
+        Science: ['atom','molecule','cell','energy','force','gravity','physics','chemistry','biology','planet'],
+        Geography: ['country','capital','continent','ocean','river','mountain','climate','largest','earth'],
+        Technology: ['computer','internet','network','database','HTML','CSS','HTTP','SQL','server','cloud'],
+        History: ['war','battle','empire','king','dynasty','independence','revolution','treaty','century'],
+        Reasoning: ['series','pattern','analogy','odd','mirror','direction','blood','coding','decoding','arrangement','syllogism'],
+        English: ['synonym','antonym','grammar','sentence','error','spelling','idiom','phrase','vocabulary','passage'],
+        'Current Affairs': ['minister','president','award','scheme','launched','appointed','committee']
     };
     return qs.map(q => {
         const t = (q.question + ' ' + q.options.join(' ')).toLowerCase();
@@ -732,7 +517,7 @@ function categorize(qs) {
             if (s > sc) { sc = s; best = c; }
         }
         q.category = best;
-        if (!q.explanation) q.explanation = `The correct answer is "${q.options[q.correctAnswer]}". This is based on fundamental concepts in ${best}.`;
+        if (!q.explanation) q.explanation = `The correct answer is "${q.options[q.correctAnswer]}".`;
         return q;
     });
 }
