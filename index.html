@@ -446,22 +446,24 @@ function strategy3_questions(lines) {
                     cleaned.slice(0, j).filter(l=>l!=='---PAGE_BREAK---'&&l.trim()).length);
                 
                 // Simple check: does this line look like an option?
+                // Must be SHORT and match a specific option pattern
                 const isOption = (
                     /^[\s]*(?:\(?[A-Da-d1-4]\)?[.):\-\s]+)/.test(nextLine) ||
-                    /^Rs\.?\s*\d/.test(nextLine) ||
-                    /^\$?\d+[\.,]?\d*\s*(cm|m|km|kg|%|years?)?$/.test(nextLine) ||
-                    /^\d+\s*(cm|m|km|kg|g|%|years?|days?|hrs?|min|sec)?\s*$/.test(nextLine)
+                    (nextLine.length < 20 && /^Rs\.?\s*\d/.test(nextLine)) ||
+                    (nextLine.length < 15 && /^\d+[\.,]?\d*\s*(cm|m|km|kg|%|years?)?\.?\s*$/.test(nextLine)) ||
+                    (nextLine.length < 15 && /^[\-\+]?\$?\d+[\.,]?\d*\s*$/.test(nextLine))
                 );
                 
                 // If it's clearly an option, stop collecting question text
                 if (isOption) break;
                 
                 // If line is short and next lines are similar (forming options), stop
-                if (nextLine.length < 40 && j + 1 < cleaned.length) {
+                // But ONLY if this line is VERY short (< 20 chars) - otherwise it's question text
+                if (nextLine.length < 20 && j + 1 < cleaned.length) {
                     const afterNext = cleaned[j + 1] ? cleaned[j + 1].trim() : '';
-                    if (afterNext && Math.abs(nextLine.length - afterNext.length) < 15 && 
-                        nextLine.length < 40 && afterNext.length < 40 &&
-                        nextLine.substring(0, 2) === afterNext.substring(0, 2)) {
+                    if (afterNext && afterNext.length < 20 &&
+                        Math.abs(nextLine.length - afterNext.length) < 10 &&
+                        nextLine.substring(0, 3) === afterNext.substring(0, 3)) {
                         break; // These look like options starting
                     }
                 }
@@ -541,68 +543,62 @@ function strategy4_aggressive(lines) {
 
 // Detect a group of consecutive lines that look like answer options
 function findOptionGroup(lines, startIdx) {
-    const result = { start: startIdx, count: 0 };
+    const result = { start: -1, count: 0 };
     
-    // Check if lines starting at startIdx form an option group
-    // Options typically: same prefix (Rs., $, %, numbers), similar length, or have A/B/C/D labels
-    
-    const candidates = [];
-    for (let j = startIdx; j < Math.min(startIdx + 6, lines.length); j++) {
-        const line = lines[j].trim();
-        if (line.length === 0) break;
+    // Scan from startIdx looking for 2+ consecutive lines that are CLEARLY options
+    for (let i = startIdx; i < lines.length - 1; i++) {
+        const candidates = [];
         
-        // Strong option indicators
-        const hasLabel = /^[\s]*(?:\(?[A-Da-d1-4]\)?[.):\-\s]+)/.test(line);
-        // Common option patterns: starts with Rs., $, numbers, short text
-        const looksLikeOption = (
-            line.length < 60 &&
-            (/^Rs\.?\s*\d/.test(line) ||      // Rs. 52
-            /^\$?\d+[\.,]?\d*/.test(line) ||   // $52 or 52
-            /^\d+\s*(cm|m|km|kg|g|%|years?|days?|hrs?|min)/.test(line) ||  // 52 cm, 5 years
-            /^(None|All|Both|Neither|True|False|Yes|No|Cannot)/i.test(line) ||
-            hasLabel)
-        );
-        
-        if (looksLikeOption || hasLabel) {
-            candidates.push(line);
-        } else if (candidates.length >= 2) {
-            break; // We already have options, stop
-        } else {
-            // Check if it could still be an option: short line similar to previous
-            if (candidates.length > 0 && line.length < 50 && 
-                Math.abs(line.length - candidates[candidates.length-1].length) < 30) {
-                candidates.push(line);
-            } else {
-                break;
-            }
-        }
-    }
-    
-    // Also check: if 3+ consecutive lines have similar prefix pattern
-    if (candidates.length < 2) {
-        candidates.length = 0;
-        const prefixes = [];
-        for (let j = startIdx; j < Math.min(startIdx + 5, lines.length); j++) {
+        for (let j = i; j < Math.min(i + 6, lines.length); j++) {
             const line = lines[j].trim();
-            if (line.length < 50 && line.length > 0) {
-                const prefix = line.substring(0, Math.min(3, line.length));
-                prefixes.push({ line, prefix, idx: j });
-            } else break;
-        }
-        // Check if multiple lines share same prefix
-        if (prefixes.length >= 3) {
-            const p0 = prefixes[0].prefix;
-            const matching = prefixes.filter(p => p.prefix === p0 || 
-                (p.line.length < 40 && Math.abs(p.line.length - prefixes[0].line.length) < 20));
-            if (matching.length >= 3) {
-                result.start = matching[0].idx;
-                result.count = matching.length;
-                return result;
+            if (!line) break;
+            
+            // Strong option: has A/B/C/D label
+            const hasLabel = /^\s*(?:\(?[A-Da-d]\)?[.):\-\s]+)/.test(line);
+            if (hasLabel) { candidates.push(line); continue; }
+            
+            // If we already have candidates, check if this line matches their pattern
+            if (candidates.length > 0) {
+                const avgLen = candidates.reduce((s, c) => s + c.length, 0) / candidates.length;
+                // Option lines should be similar length (within 2x) and SHORT
+                if (line.length <= Math.max(avgLen * 2.5, 25) && line.length < 50) {
+                    // Check if same prefix pattern as other candidates
+                    const firstPrefix = candidates[0].substring(0, 3);
+                    const thisPrefix = line.substring(0, 3);
+                    if (thisPrefix === firstPrefix || line.length < 20) {
+                        candidates.push(line);
+                        continue;
+                    }
+                }
+                break; // Doesn't match pattern, stop
             }
+            
+            // First candidate - must look like an option (short, specific format)
+            if (line.length < 25 && (
+                /^Rs\.?\s*\d/.test(line) ||
+                /^\d+[\.,]?\d*\s*(cm|m|km|kg|g|%|years?|days?|hrs?|min|sec|litres?|Rs\.?)?\.?\s*$/.test(line) ||
+                /^(None|All|Both|Neither|True|False|Yes|No|Cannot)/i.test(line) ||
+                /^[\-\+]?\$?\d+[\.,]?\d*\s*$/.test(line)
+            )) {
+                candidates.push(line);
+                continue;
+            }
+            
+            // Skip lines that are too long or look like sentences (have verbs, periods mid-sentence)
+            if (line.length > 35 || (line.includes('.') && line.indexOf('.') < line.length - 3)) {
+                // This is likely a sentence, not an option — skip it
+                if (candidates.length >= 2) break;
+                continue;
+            }
+        }
+        
+        if (candidates.length >= 2) {
+            result.start = i;
+            result.count = candidates.length;
+            return result;
         }
     }
     
-    result.count = candidates.length;
     return result;
 }
 
