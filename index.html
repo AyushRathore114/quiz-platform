@@ -3,769 +3,581 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>QuizMaster Pro - Online Test Platform</title>
+<title>QuizMaster Pro - Test Platform</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
-/* ===== RESET ===== */
 *{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#f0f2f5;color:#333;overflow:hidden;height:100vh;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f5f5;height:100vh;overflow:hidden;}
+.screen{display:none;height:100vh;width:100%;}
+.screen.active{display:flex;flex-direction:column;}
 
 /* ===== UPLOAD SCREEN ===== */
-.screen{display:none;width:100%;height:100vh;}
-.screen.active{display:flex;}
-
-#uploadScreen{
-    align-items:center;justify-content:center;
-    background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
-    flex-direction:column;
-}
-.upload-box{
-    background:#fff;border-radius:16px;padding:48px;max-width:550px;width:90%;
-    box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center;
-}
-.upload-box h1{font-size:28px;color:#333;margin-bottom:8px;}
-.upload-box .subtitle{color:#666;margin-bottom:32px;font-size:15px;}
-.upload-zone{
-    border:3px dashed #d0d5dd;border-radius:12px;padding:48px 24px;
-    cursor:pointer;transition:all 0.3s;margin-bottom:24px;background:#fafbfc;
-}
-.upload-zone:hover{border-color:#667eea;background:#f0f1ff;}
-.upload-zone .icon{font-size:48px;margin-bottom:12px;}
-.upload-zone h3{color:#333;margin-bottom:4px;}
-.upload-zone p{color:#888;font-size:13px;}
-.upload-progress{display:none;margin:16px 0;}
-.upload-progress.active{display:block;}
-.progress-track{height:6px;background:#e0e0e0;border-radius:3px;overflow:hidden;}
-.progress-bar-fill{height:100%;background:linear-gradient(90deg,#667eea,#764ba2);width:0%;transition:width 0.3s;}
-.progress-msg{font-size:13px;color:#666;margin-top:8px;}
-.divider{margin:24px 0;color:#aaa;font-size:13px;position:relative;}
-.divider::before,.divider::after{content:'';position:absolute;top:50%;width:42%;height:1px;background:#ddd;}
-.divider::before{left:0;}
-.divider::after{right:0;}
-.btn-sample{
-    background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;
-    border:none;padding:14px 32px;border-radius:8px;font-size:15px;font-weight:600;
-    cursor:pointer;transition:transform 0.2s,box-shadow 0.2s;
-}
-.btn-sample:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(102,126,234,0.4);}
-
-/* ===== EXAM SCREEN (Testbook/Oliveboard Style) ===== */
-#examScreen{flex-direction:column;height:100vh;}
-
-/* Header */
-.exam-header{
-    background:#1a237e;color:#fff;display:flex;align-items:center;
-    justify-content:space-between;padding:0 20px;height:56px;flex-shrink:0;
-}
-.exam-header .exam-title{font-size:16px;font-weight:600;display:flex;align-items:center;gap:10px;}
-.exam-header .exam-title .exam-icon{width:32px;height:32px;background:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;}
-.header-right{display:flex;align-items:center;gap:20px;}
-.timer-box{
-    background:rgba(255,255,255,0.15);padding:8px 16px;border-radius:6px;
-    font-family:'Courier New',monospace;font-size:16px;font-weight:700;
-    display:flex;align-items:center;gap:8px;
-}
-.timer-box.warning{background:rgba(255,193,7,0.3);color:#ffeb3b;}
-.timer-box.danger{background:rgba(244,67,54,0.3);color:#ff5252;animation:blink 1s infinite;}
-@keyframes blink{50%{opacity:0.6;}}
-.btn-submit-exam{
-    background:#4caf50;color:#fff;border:none;padding:8px 20px;
-    border-radius:6px;font-weight:600;cursor:pointer;font-size:14px;
-}
-.btn-submit-exam:hover{background:#43a047;}
-
-/* Subject Tabs */
-.subject-tabs{
-    background:#283593;display:flex;padding:0 20px;gap:0;flex-shrink:0;overflow-x:auto;
-}
-.subject-tab{
-    padding:10px 24px;color:rgba(255,255,255,0.7);cursor:pointer;font-size:13px;
-    font-weight:500;border-bottom:3px solid transparent;transition:all 0.2s;white-space:nowrap;
-}
-.subject-tab.active{color:#fff;border-bottom-color:#ffeb3b;background:rgba(255,255,255,0.08);}
-.subject-tab:hover{color:#fff;background:rgba(255,255,255,0.05);}
-
-/* Main Content Area */
-.exam-content{display:flex;flex:1;overflow:hidden;}
-
-/* Question Panel (Left) */
-.question-panel{
-    flex:1;display:flex;flex-direction:column;background:#fff;overflow-y:auto;
-}
-.question-area{flex:1;padding:24px 32px;overflow-y:auto;}
-.q-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
-.q-number{
-    background:#e8eaf6;color:#1a237e;padding:6px 14px;border-radius:6px;
-    font-weight:700;font-size:14px;
-}
-.q-marks{font-size:13px;color:#666;}
-.q-marks span{font-weight:600;color:#1a237e;}
-.q-text{font-size:16px;line-height:1.8;color:#222;margin-bottom:28px;padding-right:20px;}
-
-/* Options */
-.options-list{display:flex;flex-direction:column;gap:12px;}
-.option-item{
-    display:flex;align-items:flex-start;gap:14px;padding:14px 18px;
-    border:2px solid #e0e0e0;border-radius:10px;cursor:pointer;transition:all 0.2s;
-    background:#fafbfc;
-}
-.option-item:hover{border-color:#667eea;background:#f5f6ff;}
-.option-item.selected{border-color:#1a237e;background:#e8eaf6;}
-.option-item.correct{border-color:#4caf50 !important;background:#e8f5e9 !important;}
-.option-item.wrong{border-color:#f44336 !important;background:#ffebee !important;}
-.option-item.disabled{pointer-events:none;opacity:0.85;}
-.option-item.disabled.correct,.option-item.disabled.wrong{opacity:1;}
-.option-radio{
-    width:22px;height:22px;border-radius:50%;border:2px solid #bbb;
-    display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;
-}
-.option-item.selected .option-radio{border-color:#1a237e;background:#1a237e;}
-.option-item.selected .option-radio::after{content:'';width:8px;height:8px;background:#fff;border-radius:50%;}
-.option-item.correct .option-radio{border-color:#4caf50;background:#4caf50;}
-.option-item.correct .option-radio::after{content:'✓';color:#fff;font-size:12px;font-weight:700;}
-.option-item.wrong .option-radio{border-color:#f44336;background:#f44336;}
-.option-item.wrong .option-radio::after{content:'✗';color:#fff;font-size:12px;font-weight:700;}
-.option-label{font-weight:600;color:#555;margin-right:4px;min-width:16px;}
-.option-text{flex:1;font-size:15px;line-height:1.5;color:#333;}
-
-/* Feedback Banner */
-.feedback-box{
-    margin-top:20px;padding:14px 20px;border-radius:8px;display:none;
-    font-weight:600;font-size:14px;align-items:center;gap:10px;
-}
-.feedback-box.active{display:flex;}
-.feedback-box.correct{background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;}
-.feedback-box.wrong{background:#ffebee;color:#c62828;border:1px solid #ef9a9a;}
-
-/* Solution */
-.solution-box{
-    margin-top:16px;display:none;padding:20px;background:#fff8e1;
-    border:1px solid #ffe082;border-radius:8px;
-}
-.solution-box.active{display:block;}
-.solution-box h4{color:#f57f17;margin-bottom:8px;font-size:14px;}
-.solution-box p{color:#555;font-size:14px;line-height:1.7;}
-.btn-solution{
-    margin-top:12px;background:none;border:1px solid #ff9800;color:#ff9800;
-    padding:8px 16px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;
-}
-.btn-solution:hover{background:#fff3e0;}
-
-/* Bottom Navigation */
-.nav-bar{
-    display:flex;align-items:center;justify-content:space-between;
-    padding:12px 24px;background:#fff;border-top:1px solid #e0e0e0;flex-shrink:0;
-}
-.nav-left,.nav-right{display:flex;gap:10px;}
-.nav-btn{
-    padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600;
-    cursor:pointer;border:2px solid;transition:all 0.2s;
-}
-.btn-mark{border-color:#9c27b0;color:#9c27b0;background:#fff;}
-.btn-mark:hover{background:#f3e5f5;}
-.btn-clear{border-color:#ff9800;color:#ff9800;background:#fff;}
-.btn-clear:hover{background:#fff3e0;}
-.btn-prev{border-color:#607d8b;color:#607d8b;background:#fff;}
-.btn-prev:hover{background:#eceff1;}
-.btn-save-next{border-color:#1a237e;color:#fff;background:#1a237e;}
-.btn-save-next:hover{background:#283593;}
-
-/* Right Sidebar - Question Palette */
-.sidebar{
-    width:280px;background:#fff;border-left:1px solid #e0e0e0;
-    display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;
-}
-.sidebar-header{
-    padding:14px 16px;background:#f5f5f5;border-bottom:1px solid #e0e0e0;
-    font-weight:700;font-size:14px;color:#333;
-}
-.sidebar-legend{
-    display:flex;flex-wrap:wrap;gap:8px;padding:12px 16px;border-bottom:1px solid #e0e0e0;
-    font-size:11px;
-}
-.legend-item{display:flex;align-items:center;gap:4px;}
-.legend-dot{width:16px;height:16px;border-radius:4px;font-size:9px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;}
-.legend-dot.answered{background:#4caf50;}
-.legend-dot.not-answered{background:#f44336;}
-.legend-dot.marked{background:#9c27b0;}
-.legend-dot.not-visited{background:#bbb;}
-.legend-dot.current{background:#1a237e;}
-
-.palette-grid{
-    display:grid;grid-template-columns:repeat(5,1fr);gap:8px;
-    padding:16px;overflow-y:auto;flex:1;
-}
-.palette-btn{
-    width:36px;height:36px;border-radius:6px;border:none;font-size:13px;
-    font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;
-    transition:all 0.2s;background:#e0e0e0;color:#555;
-}
-.palette-btn.answered{background:#4caf50;color:#fff;}
-.palette-btn.wrong-answer{background:#f44336;color:#fff;}
-.palette-btn.not-answered{background:#f44336;color:#fff;}
-.palette-btn.marked{background:#9c27b0;color:#fff;}
-.palette-btn.current{background:#1a237e;color:#fff;box-shadow:0 2px 8px rgba(26,35,126,0.4);}
-.palette-btn.not-visited{background:#e0e0e0;color:#555;}
-.palette-btn:hover{transform:scale(1.1);}
-
-/* ===== RESULTS SCREEN ===== */
-#resultsScreen{flex-direction:column;overflow-y:auto;background:#f0f2f5;}
-.results-wrapper{max-width:900px;margin:0 auto;padding:32px 20px;width:100%;}
-.results-header{text-align:center;margin-bottom:32px;}
-.results-header h1{font-size:28px;color:#1a237e;margin-bottom:8px;}
-.results-header p{color:#666;}
-
-.score-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px;}
-.score-card{
-    background:#fff;border-radius:12px;padding:24px 16px;text-align:center;
-    box-shadow:0 2px 8px rgba(0,0,0,0.06);border-top:4px solid;
-}
-.score-card.correct{border-top-color:#4caf50;}
-.score-card.wrong{border-top-color:#f44336;}
-.score-card.skipped{border-top-color:#ff9800;}
-.score-card.time{border-top-color:#2196f3;}
-.score-card .num{font-size:32px;font-weight:800;margin-bottom:4px;}
-.score-card.correct .num{color:#4caf50;}
-.score-card.wrong .num{color:#f44336;}
-.score-card.skipped .num{color:#ff9800;}
-.score-card.time .num{color:#2196f3;}
-.score-card .label{font-size:13px;color:#777;}
-
-.score-banner{
-    background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;
-    border-radius:12px;padding:32px;text-align:center;margin-bottom:32px;
-}
-.score-banner .big-score{font-size:56px;font-weight:800;}
-.score-banner .score-subtitle{font-size:15px;opacity:0.9;margin-top:4px;}
-
-.results-table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:24px;}
-.results-table th{background:#1a237e;color:#fff;padding:12px 16px;font-size:13px;text-align:left;}
-.results-table td{padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:13px;}
-.results-table tr:last-child td{border-bottom:none;}
-.results-table tr:hover td{background:#f8f9ff;}
-.status-badge{padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600;}
-.status-badge.correct{background:#e8f5e9;color:#2e7d32;}
-.status-badge.wrong{background:#ffebee;color:#c62828;}
-.status-badge.skipped{background:#fff3e0;color:#e65100;}
-
-.results-actions{display:flex;justify-content:center;gap:16px;margin-top:24px;}
-.results-actions .btn-sample{padding:12px 28px;font-size:14px;}
-.btn-outline-r{background:#fff;color:#667eea;border:2px solid #667eea;padding:12px 28px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;}
-.btn-outline-r:hover{background:#f0f1ff;}
+#uploadScreen{align-items:center;justify-content:center;background:linear-gradient(135deg,#00bcd4,#009688);}
+.upload-card{background:#fff;border-radius:12px;padding:48px 40px;width:90%;max-width:500px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.2);}
+.upload-card h1{color:#00796b;font-size:26px;margin-bottom:6px;}
+.upload-card .sub{color:#777;font-size:14px;margin-bottom:28px;}
+.drop-zone{border:2px dashed #ccc;border-radius:10px;padding:40px 20px;cursor:pointer;transition:0.3s;background:#fafafa;margin-bottom:20px;}
+.drop-zone:hover{border-color:#00bcd4;background:#e0f7fa;}
+.drop-zone .dz-icon{font-size:40px;margin-bottom:8px;}
+.drop-zone h3{font-size:16px;color:#333;margin-bottom:4px;}
+.drop-zone p{font-size:12px;color:#999;}
+.up-progress{display:none;margin-bottom:16px;}
+.up-progress.show{display:block;}
+.up-bar{height:5px;background:#e0e0e0;border-radius:3px;overflow:hidden;}
+.up-fill{height:100%;width:0%;background:#00bcd4;transition:width 0.3s;}
+.up-msg{font-size:12px;color:#666;margin-top:6px;}
+.or-line{color:#aaa;margin:20px 0;font-size:13px;}
+.btn-start{background:#00bcd4;color:#fff;border:none;padding:12px 28px;border-radius:6px;font-size:15px;font-weight:600;cursor:pointer;}
+.btn-start:hover{background:#00acc1;}
 </style>
 </head>
 <body>
-
-<!-- ========== UPLOAD SCREEN ========== -->
+<!-- UPLOAD SCREEN -->
 <div class="screen active" id="uploadScreen">
-    <div class="upload-box">
-        <h1>QuizMaster Pro</h1>
-        <p class="subtitle">Upload your question PDF and start practicing instantly</p>
-        <div class="upload-zone" id="uploadZone">
-            <div class="icon">📄</div>
-            <h3>Drop your PDF here</h3>
-            <p>or click to browse files (MCQ format)</p>
-        </div>
-        <input type="file" id="pdfInput" accept=".pdf" hidden>
-        <div class="upload-progress" id="uploadProgress">
-            <div class="progress-track"><div class="progress-bar-fill" id="progressFill"></div></div>
-            <p class="progress-msg" id="progressMsg">Extracting questions...</p>
-        </div>
-        <div class="divider">OR</div>
-        <button class="btn-sample" id="btnSample">🎯 Try with Sample Questions</button>
-    </div>
+<div class="upload-card">
+<h1>QuizMaster Pro</h1>
+<p class="sub">Upload question PDF or try sample questions</p>
+<div class="drop-zone" id="dropZone">
+<div class="dz-icon">📄</div>
+<h3>Drop PDF here or click to browse</h3>
+<p>Supports MCQ format PDFs</p>
+</div>
+<input type="file" id="fileInput" accept=".pdf" hidden>
+<div class="up-progress" id="upProgress">
+<div class="up-bar"><div class="up-fill" id="upFill"></div></div>
+<p class="up-msg" id="upMsg">Processing...</p>
+</div>
+<div class="or-line">— OR —</div>
+<button class="btn-start" id="btnSample">🎯 Start Sample Test (15 Questions)</button>
+</div>
 </div>
 
-<!-- ========== EXAM SCREEN ========== -->
+
+<!-- EXAM SCREEN (Testbook Style) -->
 <div class="screen" id="examScreen">
-    <!-- Header -->
-    <div class="exam-header">
-        <div class="exam-title">
-            <div class="exam-icon">📝</div>
-            <span id="examTitle">Practice Test</span>
-        </div>
-        <div class="header-right">
-            <div class="timer-box" id="timerBox">
-                ⏱️ <span id="timerDisplay">00:00</span>
-            </div>
-            <button class="btn-submit-exam" id="btnFinish">Submit Test</button>
-        </div>
-    </div>
-    
-    <!-- Subject Tabs -->
-    <div class="subject-tabs" id="subjectTabs"></div>
-    
-    <!-- Content -->
-    <div class="exam-content">
-        <!-- Question Panel -->
-        <div class="question-panel">
-            <div class="question-area">
-                <div class="q-header">
-                    <span class="q-number" id="qNumber">Question 1</span>
-                    <span class="q-marks">Marks: <span>+1</span> | <span style="color:#f44336;">-0</span></span>
-                </div>
-                <div class="q-text" id="qText">Loading question...</div>
-                <div class="options-list" id="optionsList"></div>
-                
-                <!-- Feedback -->
-                <div class="feedback-box" id="feedbackBox">
-                    <span id="feedbackIcon">✓</span>
-                    <span id="feedbackMsg">Correct!</span>
-                </div>
-                
-                <!-- Solution -->
-                <button class="btn-solution" id="btnShowSolution" style="display:none;">💡 View Solution</button>
-                <div class="solution-box" id="solutionBox">
-                    <h4>💡 Solution</h4>
-                    <p id="solutionText"></p>
-                </div>
-            </div>
-            
-            <!-- Navigation Bar -->
-            <div class="nav-bar">
-                <div class="nav-left">
-                    <button class="nav-btn btn-mark" id="btnMark">⚑ Mark for Review</button>
-                    <button class="nav-btn btn-clear" id="btnClear">✕ Clear Response</button>
-                </div>
-                <div class="nav-right">
-                    <button class="nav-btn btn-prev" id="btnPrev">← Previous</button>
-                    <button class="nav-btn btn-save-next" id="btnNext">Save & Next →</button>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Right Sidebar -->
-        <div class="sidebar">
-            <div class="sidebar-header">Question Palette</div>
-            <div class="sidebar-legend">
-                <div class="legend-item"><div class="legend-dot answered">1</div> Answered</div>
-                <div class="legend-item"><div class="legend-dot not-answered">1</div> Not Answered</div>
-                <div class="legend-item"><div class="legend-dot marked">1</div> Marked</div>
-                <div class="legend-item"><div class="legend-dot not-visited">1</div> Not Visited</div>
-                <div class="legend-item"><div class="legend-dot current">1</div> Current</div>
-            </div>
-            <div class="palette-grid" id="paletteGrid"></div>
-        </div>
-    </div>
+<!-- Top Header - Teal bar -->
+<div class="tb-header">
+<div class="tb-header-left">
+<span class="tb-back" id="btnBack">←</span>
+<div class="tb-title-block">
+<div class="tb-title-main">Tests</div>
+<div class="tb-title-sub" id="testName">Practice Test</div>
+</div>
+</div>
+<div class="tb-header-right">
+<div class="tb-timer" id="tbTimer">⏱ <span id="timerVal">00:00</span></div>
+<div class="tb-stars">★★★★★</div>
+<span class="tb-analytics" id="btnAnalytics">ANALYTICS</span>
+</div>
+</div>
+<!-- Section Tabs -->
+<div class="tb-sections" id="sectionTabs">
+<span class="tb-sec-label">SECTIONS</span>
+</div>
+<!-- Main Content -->
+<div class="tb-main">
+<!-- Left: Question Area -->
+<div class="tb-question-panel">
+<div class="tb-q-topbar">
+<div class="tb-q-info">
+<span class="tb-q-num" id="qNumLabel">Question No.1</span>
+<span class="tb-q-status" id="qStatusBadge"></span>
+<span class="tb-q-time">⏱ You: <span id="qTimeYou">00:00</span></span>
+<span class="tb-q-marks">Marks <span class="marks-val" id="qMarks">1</span></span>
+</div>
+<div class="tb-q-actions">
+<span class="tb-save-q">🔖 Save</span>
+<span class="tb-report-q">⚠ Report</span>
+</div>
+</div>
+<div class="tb-q-body" id="qBody">
+<p class="tb-q-text" id="qText">Loading...</p>
+<div class="tb-options" id="optionsList"></div>
+<!-- Feedback after answer -->
+<div class="tb-feedback" id="tbFeedback"></div>
+<!-- Solution -->
+<div class="tb-solution-toggle" id="solutionToggle" style="display:none;">
+<span class="sol-icon">👁</span>
+<a class="sol-link" id="btnViewSol">View Solution</a>
+<span class="sol-hint">Click here to see the answer now</span>
+</div>
+<div class="tb-solution-box" id="solutionBox" style="display:none;">
+<div class="sol-header">Solution</div>
+<p class="sol-text" id="solText"></p>
+</div>
+</div>
+</div>
+<!-- Right: Sidebar -->
+<div class="tb-sidebar">
+<div class="tb-user-info">
+<div class="tb-avatar">👤</div>
+<div class="tb-user-name">Student</div>
+<span class="tb-filter">🔽 Filter</span>
+</div>
+<div class="tb-palette-stats" id="paletteStats">
+<span class="ps-item correct"><b id="psCorrect">0</b> Correct</span>
+<span class="ps-item unattempted"><b id="psUnattempted">0</b> Unattempted</span>
+<span class="ps-item incorrect"><b id="psIncorrect">0</b> Incorrect</span>
+</div>
+<div class="tb-section-label" id="paletteSectionLabel">SECTION: General</div>
+<div class="tb-palette" id="palette"></div>
+</div>
+</div>
+<!-- Bottom Nav -->
+<div class="tb-bottom">
+<div class="tb-bottom-left">
+<button class="tb-btn-prev" id="btnPrev">Previous</button>
+</div>
+<div class="tb-bottom-center">
+<span class="tb-reattempt">Re-attempt Questions</span>
+</div>
+<div class="tb-bottom-right">
+<button class="tb-btn-next" id="btnNext">Next</button>
+<button class="tb-btn-qp" id="btnSubmit">Submit Test</button>
+<button class="tb-btn-summary" id="btnSummary">Summary</button>
+</div>
+</div>
 </div>
 
-<!-- ========== RESULTS SCREEN ========== -->
+
+<!-- RESULTS SCREEN (Testbook Style) -->
 <div class="screen" id="resultsScreen">
-    <div class="results-wrapper">
-        <div class="results-header">
-            <h1>📊 Test Analysis</h1>
-            <p>Here's how you performed</p>
-        </div>
-        
-        <div class="score-banner">
-            <div class="big-score" id="bigScore">0%</div>
-            <div class="score-subtitle">Overall Score</div>
-        </div>
-        
-        <div class="score-cards">
-            <div class="score-card correct"><div class="num" id="rCorrect">0</div><div class="label">Correct</div></div>
-            <div class="score-card wrong"><div class="num" id="rWrong">0</div><div class="label">Incorrect</div></div>
-            <div class="score-card skipped"><div class="num" id="rSkipped">0</div><div class="label">Unattempted</div></div>
-            <div class="score-card time"><div class="num" id="rTime">0s</div><div class="label">Avg Time/Q</div></div>
-        </div>
-        
-        <table class="results-table">
-            <thead><tr><th>#</th><th>Question</th><th>Your Answer</th><th>Correct Answer</th><th>Time</th><th>Status</th></tr></thead>
-            <tbody id="resultsBody"></tbody>
-        </table>
-        
-        <div class="results-actions">
-            <button class="btn-sample" id="btnRetry">🔄 Retry Test</button>
-            <button class="btn-outline-r" id="btnExport">📥 Export JSON</button>
-            <button class="btn-outline-r" id="btnNewQuiz">📄 New Test</button>
-        </div>
-    </div>
+<div class="res-header">
+<div class="res-header-left">
+<span class="res-logo">📝 testbook</span>
+<span class="res-test-name" id="resTestName">Practice Test</span>
 </div>
+<div class="res-header-right">
+<button class="res-btn-reattempt" id="btnReattempt">Reattempt This Test ▶</button>
+<span class="res-goto">Go to Tests</span>
+<button class="res-btn-solutions" id="btnSolutions">Solutions</button>
+</div>
+</div>
+<div class="res-body" id="resBody">
+<h2 class="res-section-title">Overall Performance Summary</h2>
+<div class="res-summary-cards" id="resSummaryCards"></div>
+<h2 class="res-section-title">Sectional Summary</h2>
+<table class="res-table" id="resTable">
+<thead><tr><th>Section Name</th><th>Score</th><th>Attempted</th><th>Accuracy</th><th>Time</th></tr></thead>
+<tbody id="resTableBody"></tbody>
+</table>
+<h2 class="res-section-title">Detailed Question Analysis</h2>
+<table class="res-detail-table">
+<thead><tr><th>#</th><th>Question</th><th>Your Answer</th><th>Correct Answer</th><th>Time</th><th>Status</th></tr></thead>
+<tbody id="resDetailBody"></tbody>
+</table>
+<div class="res-actions">
+<button class="btn-start" id="btnRetry2">🔄 Retry</button>
+<button class="btn-start" id="btnExport2" style="background:#ff9800;">📥 Export JSON</button>
+<button class="btn-start" id="btnNew2" style="background:#607d8b;">📄 New Test</button>
+</div>
+</div>
+</div>
+
+
+<style>
+/* ===== EXAM SCREEN - TESTBOOK CLONE ===== */
+#examScreen{overflow:hidden;}
+.tb-header{background:#00838f;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:10px 20px;height:52px;flex-shrink:0;}
+.tb-header-left{display:flex;align-items:center;gap:12px;}
+.tb-back{font-size:20px;cursor:pointer;padding:4px 8px;}
+.tb-title-main{font-size:14px;font-weight:700;}
+.tb-title-sub{font-size:12px;opacity:0.85;}
+.tb-header-right{display:flex;align-items:center;gap:20px;}
+.tb-timer{background:rgba(255,255,255,0.15);padding:6px 14px;border-radius:4px;font-size:14px;font-weight:600;}
+.tb-stars{font-size:18px;color:#ffd54f;letter-spacing:2px;}
+.tb-analytics{font-weight:700;font-size:13px;cursor:pointer;letter-spacing:1px;}
+
+/* Section Tabs */
+.tb-sections{background:#fff;border-bottom:2px solid #e0e0e0;display:flex;align-items:center;padding:0 16px;gap:0;flex-shrink:0;height:42px;overflow-x:auto;}
+.tb-sec-label{font-size:12px;color:#666;font-weight:600;margin-right:12px;white-space:nowrap;}
+.tb-sec-tab{padding:10px 16px;font-size:13px;color:#555;cursor:pointer;border-bottom:3px solid transparent;font-weight:500;white-space:nowrap;transition:0.2s;}
+.tb-sec-tab.active{color:#00838f;border-bottom-color:#00838f;background:#e0f2f1;font-weight:600;border-radius:4px 4px 0 0;}
+.tb-sec-tab:hover{color:#00838f;}
+
+/* Main Layout */
+.tb-main{display:flex;flex:1;overflow:hidden;}
+.tb-question-panel{flex:1;display:flex;flex-direction:column;overflow:hidden;border-right:1px solid #e0e0e0;}
+.tb-q-topbar{display:flex;align-items:center;justify-content:space-between;padding:10px 24px;background:#fff;border-bottom:1px solid #eee;flex-shrink:0;}
+.tb-q-info{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.tb-q-num{font-weight:700;font-size:14px;color:#333;}
+.tb-q-status{padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;display:none;}
+.tb-q-status.correct{display:inline;background:#4caf50;color:#fff;}
+.tb-q-status.wrong{display:inline;background:#f44336;color:#fff;}
+.tb-q-time{font-size:12px;color:#666;}
+.tb-q-marks{font-size:12px;color:#666;background:#e3f2fd;padding:2px 8px;border-radius:10px;}
+.marks-val{font-weight:700;color:#1565c0;}
+.tb-q-actions{display:flex;gap:12px;font-size:12px;color:#888;}
+.tb-q-actions span{cursor:pointer;}
+.tb-q-actions span:hover{color:#00838f;}
+
+/* Question Body */
+.tb-q-body{flex:1;overflow-y:auto;padding:24px 32px;background:#fff;}
+.tb-q-text{font-size:16px;line-height:1.8;color:#222;margin-bottom:28px;}
+.tb-options{display:flex;flex-direction:column;gap:0;}
+.tb-opt{display:flex;align-items:center;gap:14px;padding:16px 0;border-bottom:1px solid #f0f0f0;cursor:pointer;transition:0.15s;}
+.tb-opt:last-child{border-bottom:none;}
+.tb-opt:hover{background:#f5f5f5;}
+.tb-opt.selected{background:#e0f2f1;}
+.tb-opt.correct-opt{background:#e8f5e9;}
+.tb-opt.wrong-opt{background:#ffebee;}
+.tb-opt.locked{pointer-events:none;}
+.tb-radio{width:20px;height:20px;border-radius:50%;border:2px solid #bbb;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:0.2s;}
+.tb-opt.selected .tb-radio{border-color:#00838f;background:#00838f;}
+.tb-opt.selected .tb-radio::after{content:'';width:8px;height:8px;background:#fff;border-radius:50%;}
+.tb-opt.correct-opt .tb-radio{border-color:#4caf50;background:#4caf50;}
+.tb-opt.correct-opt .tb-radio::after{content:'✓';color:#fff;font-size:11px;font-weight:700;}
+.tb-opt.wrong-opt .tb-radio{border-color:#f44336;background:#f44336;}
+.tb-opt.wrong-opt .tb-radio::after{content:'✗';color:#fff;font-size:11px;font-weight:700;}
+.tb-opt-text{font-size:15px;color:#333;line-height:1.5;}
+
+/* Feedback */
+.tb-feedback{margin-top:16px;padding:12px 16px;border-radius:6px;font-size:13px;font-weight:600;display:none;}
+.tb-feedback.show{display:block;}
+.tb-feedback.correct{background:#e8f5e9;color:#2e7d32;border-left:4px solid #4caf50;}
+.tb-feedback.wrong{background:#ffebee;color:#c62828;border-left:4px solid #f44336;}
+
+/* Solution */
+.tb-solution-toggle{margin-top:20px;padding:12px 16px;background:#fff3e0;border-radius:6px;display:flex;align-items:center;gap:8px;}
+.sol-icon{font-size:16px;}
+.sol-link{color:#00838f;font-weight:600;font-size:13px;cursor:pointer;text-decoration:none;}
+.sol-link:hover{text-decoration:underline;}
+.sol-hint{font-size:12px;color:#888;}
+.tb-solution-box{margin-top:12px;padding:20px;background:#f9fbe7;border:1px solid #dce775;border-radius:6px;}
+.sol-header{font-weight:700;color:#33691e;margin-bottom:8px;font-size:14px;}
+.sol-text{font-size:14px;color:#444;line-height:1.7;}
+
+
+/* ===== RIGHT SIDEBAR ===== */
+.tb-sidebar{width:300px;background:#fff;display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;}
+.tb-user-info{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid #eee;}
+.tb-avatar{width:36px;height:36px;background:#e0e0e0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;}
+.tb-user-name{font-weight:600;font-size:14px;flex:1;}
+.tb-filter{font-size:12px;color:#00838f;cursor:pointer;}
+.tb-palette-stats{display:flex;gap:8px;padding:10px 16px;border-bottom:1px solid #eee;flex-wrap:wrap;}
+.ps-item{font-size:11px;padding:3px 8px;border-radius:4px;border:1px solid #ddd;display:flex;align-items:center;gap:4px;}
+.ps-item.correct b{color:#4caf50;}.ps-item.correct{border-color:#4caf50;}
+.ps-item.unattempted b{color:#666;}.ps-item.unattempted{border-color:#999;}
+.ps-item.incorrect b{color:#f44336;}.ps-item.incorrect{border-color:#f44336;}
+.tb-section-label{padding:10px 16px;font-size:12px;font-weight:700;color:#00838f;background:#e0f2f1;border-bottom:1px solid #eee;}
+.tb-palette{padding:16px;display:grid;grid-template-columns:repeat(5,1fr);gap:10px;overflow-y:auto;flex:1;}
+.pal-btn{width:38px;height:38px;border-radius:50%;border:2px solid #ddd;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:0.2s;background:#fff;color:#333;}
+.pal-btn:hover{transform:scale(1.1);}
+.pal-btn.current{border-color:#1a237e;background:#1a237e;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.3);}
+.pal-btn.answered{border-color:#4caf50;background:#4caf50;color:#fff;}
+.pal-btn.wrong-a{border-color:#f44336;background:#f44336;color:#fff;}
+.pal-btn.not-visited{border-color:#ddd;background:#fff;color:#666;}
+.pal-btn.marked{border-color:#9c27b0;background:#9c27b0;color:#fff;}
+
+/* ===== BOTTOM NAV ===== */
+.tb-bottom{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:#fff;border-top:2px solid #e0e0e0;flex-shrink:0;}
+.tb-bottom-left,.tb-bottom-right{display:flex;gap:10px;}
+.tb-bottom-center{font-size:13px;color:#555;}
+.tb-btn-prev,.tb-btn-next{padding:8px 20px;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;border:none;}
+.tb-btn-prev{background:#37474f;color:#fff;}
+.tb-btn-prev:hover{background:#455a64;}
+.tb-btn-next{background:#00838f;color:#fff;}
+.tb-btn-next:hover{background:#00695c;}
+.tb-btn-qp,.tb-btn-summary{padding:8px 16px;border:2px solid #00838f;background:#fff;color:#00838f;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;}
+.tb-btn-qp:hover,.tb-btn-summary:hover{background:#e0f2f1;}
+
+/* ===== RESULTS SCREEN ===== */
+#resultsScreen{overflow-y:auto;}
+.res-header{background:#fff;border-bottom:1px solid #e0e0e0;display:flex;align-items:center;justify-content:space-between;padding:12px 24px;flex-shrink:0;}
+.res-header-left{display:flex;align-items:center;gap:16px;}
+.res-logo{font-weight:700;font-size:18px;color:#00838f;}
+.res-test-name{font-size:14px;color:#333;font-weight:500;}
+.res-header-right{display:flex;align-items:center;gap:12px;}
+.res-btn-reattempt{background:#e0f7fa;color:#00838f;border:2px solid #00bcd4;padding:8px 16px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;}
+.res-goto{font-size:13px;color:#00838f;font-weight:600;cursor:pointer;}
+.res-btn-solutions{background:#fff;border:2px solid #ff9800;color:#ff9800;padding:8px 16px;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;}
+.res-body{padding:32px 48px;max-width:1100px;margin:0 auto;}
+.res-section-title{font-size:18px;color:#333;margin:28px 0 16px;font-weight:700;}
+.res-summary-cards{display:flex;gap:0;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;margin-bottom:24px;}
+.res-s-card{flex:1;padding:16px 20px;display:flex;align-items:center;gap:12px;border-right:1px solid #e0e0e0;background:#fff;}
+.res-s-card:last-child{border-right:none;}
+.res-s-icon{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;}
+.res-s-icon.rank{background:#f44336;}.res-s-icon.score{background:#00bcd4;}.res-s-icon.attempted{background:#4caf50;}.res-s-icon.accuracy{background:#ff9800;}.res-s-icon.percentile{background:#9c27b0;}
+.res-s-val{font-size:20px;font-weight:800;color:#333;}
+.res-s-total{font-size:13px;color:#999;}
+.res-s-label{font-size:11px;color:#999;margin-top:2px;}
+.res-table,.res-detail-table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;margin-bottom:24px;}
+.res-table th,.res-detail-table th{background:#f5f5f5;padding:12px 16px;font-size:12px;color:#00838f;text-align:left;border-bottom:1px solid #e0e0e0;}
+.res-table td,.res-detail-table td{padding:14px 16px;font-size:13px;border-bottom:1px solid #f0f0f0;}
+.res-table tr:last-child td,.res-detail-table tr:last-child td{border-bottom:none;}
+.accuracy-bar{display:inline-block;padding:2px 8px;border-radius:4px;font-weight:600;font-size:12px;}
+.accuracy-bar.high{background:#e8f5e9;color:#2e7d32;}
+.accuracy-bar.mid{background:#fff3e0;color:#e65100;}
+.accuracy-bar.low{background:#ffebee;color:#c62828;}
+.status-dot{display:inline-block;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600;}
+.status-dot.c{background:#e8f5e9;color:#2e7d32;}.status-dot.w{background:#ffebee;color:#c62828;}.status-dot.s{background:#f5f5f5;color:#666;}
+.res-actions{text-align:center;margin-top:24px;display:flex;gap:12px;justify-content:center;}
+</style>
+
 
 <script>
 // ===== PDF PARSER =====
-class PDFQuestionParser {
-    constructor() {
-        if (typeof pdfjsLib !== 'undefined') {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-        }
-    }
-    async parsePDF(file, onProgress) {
-        onProgress(10, 'Reading PDF...');
-        const ab = await file.arrayBuffer();
-        onProgress(20, 'Loading document...');
-        const pdf = await pdfjsLib.getDocument({data:ab}).promise;
-        let fullText = '';
-        for (let i=1; i<=pdf.numPages; i++) {
-            onProgress(20 + (i/pdf.numPages)*40, `Page ${i}/${pdf.numPages}...`);
-            const page = await pdf.getPage(i);
-            const tc = await page.getTextContent();
-            fullText += tc.items.map(x=>x.str).join(' ') + '\n\n';
-        }
-        onProgress(65, 'Detecting questions...');
-        const questions = this.extract(fullText);
-        onProgress(90, 'Categorizing...');
-        return this.categorize(questions);
-    }
-    extract(text) {
-        text = text.replace(/\s+/g,' ').trim();
-        const qs = [];
-        // Try numbered pattern: "1." or "Q1."
-        const blocks = text.split(/(?=(?:^|\s)(?:Q(?:uestion)?[\s.]*)?(\d+)[.)]\s)/i);
-        let currentBlock = '';
-        for (const b of blocks) {
-            if (/^\d+$/.test(b.trim())) { if(currentBlock) { const p=this.parseBlock(currentBlock); if(p)qs.push(p); } currentBlock=''; }
-            else { currentBlock += b + ' '; }
-        }
-        if(currentBlock){const p=this.parseBlock(currentBlock);if(p)qs.push(p);}
-        if(qs.length>=2) return qs;
-        // Fallback: find questions with ?
-        const sentences = text.split(/(?<=[?])\s+/);
-        let q='',opts=[];
-        for(const s of sentences){
-            if(s.includes('?')){if(q&&opts.length>=2){qs.push({question:q,options:opts.slice(0,4),correctAnswer:0,explanation:''});}q=s.trim();opts=[];}
-            else{const m=s.match(/^[A-Da-d][.)]\s*(.*)/);if(m)opts.push(m[1].trim());}
-        }
-        if(q&&opts.length>=2)qs.push({question:q,options:opts.slice(0,4),correctAnswer:0,explanation:''});
-        return qs;
-    }
-    parseBlock(block) {
-        if(block.trim().length<10)return null;
-        const optMatch=[...block.matchAll(/([A-D])[.)]\s*([^\n]+)/gi)];
-        if(optMatch.length<2)return null;
-        const fi=block.indexOf(optMatch[0][0]);
-        let qText=block.substring(0,fi).trim().replace(/^\d+[.)]\s*/,'').replace(/^Q(?:uestion)?[\s.]*\d*[.):\s]*/i,'').trim();
-        if(qText.length<5)return null;
-        const options=optMatch.map(m=>m[2].trim()).slice(0,4);
-        let correct=0;
-        const ansM=block.match(/(?:answer|ans|correct)[:\s]*([A-D])/i);
-        if(ansM)correct=ansM[1].toUpperCase().charCodeAt(0)-65;
-        return {question:qText,options,correctAnswer:correct,explanation:''};
-    }
-    categorize(questions) {
-        const kw={Programming:['code','function','variable','loop','array','class','algorithm','programming'],Mathematics:['calculate','equation','formula','algebra','geometry','probability'],Science:['atom','molecule','cell','energy','force','gravity','physics','chemistry','biology'],Geography:['country','capital','continent','ocean','river','mountain','climate'],Technology:['computer','internet','network','database','server','cloud','HTML','CSS','JavaScript','HTTP'],History:['war','century','kingdom','empire','revolution','independence']};
-        return questions.map(q=>{
-            const t=(q.question+' '+q.options.join(' ')).toLowerCase();
-            let best='General',score=0;
-            for(const[cat,words]of Object.entries(kw)){const s=words.filter(w=>t.includes(w)).length;if(s>score){score=s;best=cat;}}
-            q.category=best;
-            if(!q.explanation)q.explanation=`The correct answer is "${q.options[q.correctAnswer]}". Review the relevant topic in your study material for detailed understanding.`;
-            return q;
-        });
-    }
+if(typeof pdfjsLib!=='undefined')pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+async function parsePDF(file,cb){
+    cb(10,'Reading...');const ab=await file.arrayBuffer();cb(20,'Loading...');
+    const pdf=await pdfjsLib.getDocument({data:ab}).promise;let txt='';
+    for(let i=1;i<=pdf.numPages;i++){cb(20+(i/pdf.numPages)*50,`Page ${i}/${pdf.numPages}`);const p=await pdf.getPage(i);const tc=await p.getTextContent();txt+=tc.items.map(x=>x.str).join(' ')+'\n';}
+    cb(75,'Detecting questions...');const qs=extractQs(txt);cb(95,'Done!');return categorize(qs);
+}
+function extractQs(text){
+    text=text.replace(/\s+/g,' ');const qs=[];
+    const blocks=text.split(/(?=(?:\s|^)(?:Q(?:uestion)?[\s.]*)?(\d+)[.)]\s)/i);
+    let blk='';for(const b of blocks){if(/^\d+$/.test(b.trim())){if(blk){const p=parseBlk(blk);if(p)qs.push(p);}blk='';}else blk+=b+' ';}
+    if(blk){const p=parseBlk(blk);if(p)qs.push(p);}
+    if(qs.length>=2)return qs;
+    // fallback
+    const parts=text.split(/(?<=[?])\s+/);let q='',opts=[];
+    for(const s of parts){if(s.includes('?')){if(q&&opts.length>=2)qs.push({question:q,options:opts.slice(0,4),correctAnswer:0,explanation:''});q=s;opts=[];}
+    else{const m=s.match(/^[A-Da-d][.)]\s*(.*)/);if(m)opts.push(m[1].trim());}}
+    if(q&&opts.length>=2)qs.push({question:q,options:opts.slice(0,4),correctAnswer:0,explanation:''});
+    return qs;
+}
+function parseBlk(b){
+    if(b.trim().length<10)return null;
+    const om=[...b.matchAll(/([A-D])[.)]\s*([^\n]+)/gi)];if(om.length<2)return null;
+    let qt=b.substring(0,b.indexOf(om[0][0])).trim().replace(/^\d+[.)]\s*/,'').replace(/^Q(?:uestion)?[\s.]*\d*[.):\s]*/i,'').trim();
+    if(qt.length<5)return null;const opts=om.map(m=>m[2].trim()).slice(0,4);
+    let ca=0;const am=b.match(/(?:answer|ans|correct)[:\s]*([A-D])/i);if(am)ca=am[1].toUpperCase().charCodeAt(0)-65;
+    return{question:qt,options:opts,correctAnswer:ca,explanation:''};
+}
+function categorize(qs){
+    const kw={Programming:['code','function','variable','loop','array','class','algorithm','programming','python','javascript','java'],
+    Mathematics:['calculate','equation','formula','algebra','geometry','probability','number','sum','prime'],
+    Science:['atom','molecule','cell','energy','force','gravity','physics','chemistry','biology','planet','light','speed'],
+    Geography:['country','capital','continent','ocean','river','mountain','climate','largest','earth'],
+    Technology:['computer','internet','network','database','HTML','CSS','HTTP','SQL','server','cloud']};
+    return qs.map(q=>{const t=(q.question+' '+q.options.join(' ')).toLowerCase();let best='General',sc=0;
+    for(const[c,ws]of Object.entries(kw)){const s=ws.filter(w=>t.includes(w)).length;if(s>sc){sc=s;best=c;}}
+    q.category=best;if(!q.explanation)q.explanation=`The correct answer is "${q.options[q.correctAnswer]}". This is based on fundamental concepts in ${best}.`;return q;});
 }
 
 // ===== STATE =====
-const state = {
-    questions:[],currentIndex:0,answers:[],timerInterval:null,timerSeconds:0,
-    quizStarted:false,categories:[]
-};
-
-// ===== DOM =====
+const S={questions:[],idx:0,answers:[],timer:null,secs:0,started:false};
 const $=id=>document.getElementById(id);
 
 // ===== SCREENS =====
-function showScreen(name){
-    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-    $(name+'Screen').classList.add('active');
-}
+function show(name){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));$(name+'Screen').classList.add('active');}
 
 // ===== UPLOAD =====
-$('uploadZone').addEventListener('click',()=>$('pdfInput').click());
-$('pdfInput').addEventListener('change',e=>{if(e.target.files[0])handleUpload(e.target.files[0]);});
-$('uploadZone').addEventListener('dragover',e=>{e.preventDefault();e.currentTarget.style.borderColor='#667eea';});
-$('uploadZone').addEventListener('dragleave',e=>{e.currentTarget.style.borderColor='#d0d5dd';});
-$('uploadZone').addEventListener('drop',e=>{e.preventDefault();e.currentTarget.style.borderColor='#d0d5dd';if(e.dataTransfer.files[0])handleUpload(e.dataTransfer.files[0]);});
-$('btnSample').addEventListener('click',loadSample);
-
-async function handleUpload(file){
-    if(file.type!=='application/pdf'){alert('Please upload a PDF file');return;}
-    $('uploadProgress').classList.add('active');
-    try{
-        const parser=new PDFQuestionParser();
-        const qs=await parser.parsePDF(file,(p,m)=>{$('progressFill').style.width=p+'%';$('progressMsg').textContent=m;});
-        if(qs.length<1){$('progressMsg').textContent='No questions found. Try sample questions.';return;}
-        setTimeout(()=>startExam(qs),300);
-    }catch(e){$('progressMsg').textContent='Error: '+e.message;}
+$('dropZone').onclick=()=>$('fileInput').click();
+$('fileInput').onchange=e=>{if(e.target.files[0])doUpload(e.target.files[0]);};
+$('dropZone').ondragover=e=>{e.preventDefault();e.currentTarget.style.borderColor='#00bcd4';};
+$('dropZone').ondragleave=e=>{e.currentTarget.style.borderColor='#ccc';};
+$('dropZone').ondrop=e=>{e.preventDefault();if(e.dataTransfer.files[0])doUpload(e.dataTransfer.files[0]);};
+$('btnSample').onclick=loadSample;
+async function doUpload(f){
+    if(f.type!=='application/pdf'){alert('PDF only');return;}
+    $('upProgress').classList.add('show');
+    try{const qs=await parsePDF(f,(p,m)=>{$('upFill').style.width=p+'%';$('upMsg').textContent=m;});
+    if(!qs.length){$('upMsg').textContent='No questions found';return;}setTimeout(()=>startTest(qs),300);}
+    catch(e){$('upMsg').textContent='Error: '+e.message;}
 }
+</script>
 
+
+<script>
 // ===== SAMPLE QUESTIONS =====
-function loadSample(){
-    startExam([
-        {question:"What does HTML stand for?",options:["Hyper Text Markup Language","High Tech Modern Language","Hyper Transfer Markup Language","Home Tool Markup Language"],correctAnswer:0,category:"Technology",explanation:"HTML stands for HyperText Markup Language. It is the standard markup language for creating web pages."},
-        {question:"Which data structure uses LIFO (Last In, First Out) principle?",options:["Queue","Stack","Array","Linked List"],correctAnswer:1,category:"Programming",explanation:"A Stack uses LIFO. The last element added is the first one removed, like a stack of plates."},
-        {question:"What is the time complexity of binary search?",options:["O(n)","O(log n)","O(n log n)","O(1)"],correctAnswer:1,category:"Programming",explanation:"Binary search has O(log n) complexity because it halves the search space each step."},
-        {question:"Which planet is known as the Red Planet?",options:["Venus","Jupiter","Mars","Saturn"],correctAnswer:2,category:"Science",explanation:"Mars is called the Red Planet due to iron oxide (rust) on its surface."},
-        {question:"What is the capital of Japan?",options:["Seoul","Beijing","Tokyo","Bangkok"],correctAnswer:2,category:"Geography",explanation:"Tokyo is the capital of Japan and the world's most populous metropolitan area."},
-        {question:"In JavaScript, which keyword declares a block-scoped variable?",options:["var","let","function","global"],correctAnswer:1,category:"Programming",explanation:"'let' is block-scoped, unlike 'var' which is function-scoped."},
-        {question:"What does CSS stand for?",options:["Computer Style Sheets","Creative Style System","Cascading Style Sheets","Colorful Style Sheets"],correctAnswer:2,category:"Technology",explanation:"CSS = Cascading Style Sheets. It styles HTML elements on web pages."},
-        {question:"Which sorting algorithm has O(n log n) average complexity?",options:["Bubble Sort","Merge Sort","Selection Sort","Insertion Sort"],correctAnswer:1,category:"Programming",explanation:"Merge Sort uses divide-and-conquer to achieve O(n log n) in all cases."},
-        {question:"What is the speed of light approximately?",options:["300,000 km/s","150,000 km/s","500,000 km/s","100,000 km/s"],correctAnswer:0,category:"Science",explanation:"Light travels at ~299,792 km/s (≈300,000 km/s) in a vacuum."},
-        {question:"Which HTTP status code means 'Not Found'?",options:["200","301","404","500"],correctAnswer:2,category:"Technology",explanation:"404 = Not Found. 200=OK, 301=Redirect, 500=Server Error."},
-        {question:"What is the largest ocean on Earth?",options:["Atlantic Ocean","Indian Ocean","Arctic Ocean","Pacific Ocean"],correctAnswer:3,category:"Geography",explanation:"The Pacific Ocean covers ~165 million km² — larger than all land combined."},
-        {question:"In Python, which function gets the length of a list?",options:["size()","length()","len()","count()"],correctAnswer:2,category:"Programming",explanation:"len() returns the number of items. Example: len([1,2,3]) = 3."},
-        {question:"What does SQL stand for?",options:["Structured Query Language","Simple Question Language","System Query Logic","Standard Query Loop"],correctAnswer:0,category:"Technology",explanation:"SQL = Structured Query Language, used to manage relational databases."},
-        {question:"Which gas do plants absorb from the atmosphere?",options:["Oxygen","Nitrogen","Carbon Dioxide","Hydrogen"],correctAnswer:2,category:"Science",explanation:"Plants absorb CO₂ during photosynthesis and release oxygen."},
-        {question:"What is the smallest prime number?",options:["0","1","2","3"],correctAnswer:2,category:"Mathematics",explanation:"2 is the smallest and only even prime number."}
-    ]);
-}
+function loadSample(){startTest([
+{question:"What does HTML stand for?",options:["Hyper Text Markup Language","High Tech Modern Language","Hyper Transfer Markup Language","Home Tool Markup Language"],correctAnswer:0,category:"Technology",explanation:"HTML = HyperText Markup Language. The standard for creating web pages."},
+{question:"Which data structure uses LIFO (Last In, First Out)?",options:["Queue","Stack","Array","Linked List"],correctAnswer:1,category:"Programming",explanation:"Stack uses LIFO — last element added is first removed, like a stack of plates."},
+{question:"What is the time complexity of binary search?",options:["O(n)","O(log n)","O(n log n)","O(1)"],correctAnswer:1,category:"Programming",explanation:"Binary search = O(log n) because it halves the search space each step."},
+{question:"Which planet is known as the Red Planet?",options:["Venus","Jupiter","Mars","Saturn"],correctAnswer:2,category:"Science",explanation:"Mars — iron oxide (rust) gives it a reddish color."},
+{question:"What is the capital of Japan?",options:["Seoul","Beijing","Tokyo","Bangkok"],correctAnswer:2,category:"Geography",explanation:"Tokyo is Japan's capital and largest metro area."},
+{question:"In JavaScript, which keyword declares a block-scoped variable?",options:["var","let","function","global"],correctAnswer:1,category:"Programming",explanation:"'let' is block-scoped. 'var' is function-scoped."},
+{question:"What does CSS stand for?",options:["Computer Style Sheets","Creative Style System","Cascading Style Sheets","Colorful Style Sheets"],correctAnswer:2,category:"Technology",explanation:"CSS = Cascading Style Sheets — styles HTML elements."},
+{question:"Which sorting algorithm has O(n log n) average complexity?",options:["Bubble Sort","Merge Sort","Selection Sort","Insertion Sort"],correctAnswer:1,category:"Programming",explanation:"Merge Sort uses divide-and-conquer for O(n log n)."},
+{question:"What is the speed of light approximately?",options:["300,000 km/s","150,000 km/s","500,000 km/s","100,000 km/s"],correctAnswer:0,category:"Science",explanation:"Light speed ≈ 300,000 km/s in vacuum."},
+{question:"Which HTTP status code means 'Not Found'?",options:["200","301","404","500"],correctAnswer:2,category:"Technology",explanation:"404=Not Found, 200=OK, 301=Redirect, 500=Server Error."},
+{question:"What is the largest ocean on Earth?",options:["Atlantic","Indian","Arctic","Pacific"],correctAnswer:3,category:"Geography",explanation:"Pacific Ocean — 165 million km², larger than all land."},
+{question:"In Python, which function gets list length?",options:["size()","length()","len()","count()"],correctAnswer:2,category:"Programming",explanation:"len() returns item count. len([1,2,3]) = 3."},
+{question:"What does SQL stand for?",options:["Structured Query Language","Simple Question Language","System Query Logic","Standard Query Loop"],correctAnswer:0,category:"Technology",explanation:"SQL = Structured Query Language for databases."},
+{question:"Which gas do plants absorb?",options:["Oxygen","Nitrogen","Carbon Dioxide","Hydrogen"],correctAnswer:2,category:"Science",explanation:"Plants absorb CO₂ during photosynthesis, release O₂."},
+{question:"What is the smallest prime number?",options:["0","1","2","3"],correctAnswer:2,category:"Mathematics",explanation:"2 is the smallest and only even prime number."}
+]);}
 
-// ===== START EXAM =====
-function startExam(questions){
-    state.questions=questions;
-    state.currentIndex=0;
-    state.answers=questions.map(()=>({selected:-1,status:'not-visited',timeTaken:0,isCorrect:false}));
-    state.quizStarted=true;
-    state.timerSeconds=0;
-    
-    // Get unique categories
-    state.categories=[...new Set(questions.map(q=>q.category||'General'))];
-    
-    // Setup subject tabs
-    const tabs=$('subjectTabs');
-    tabs.innerHTML='<div class="subject-tab active" data-cat="all">All Questions</div>';
-    state.categories.forEach(c=>{tabs.innerHTML+=`<div class="subject-tab" data-cat="${c}">${c}</div>`;});
-    tabs.querySelectorAll('.subject-tab').forEach(t=>t.addEventListener('click',e=>{
-        tabs.querySelectorAll('.subject-tab').forEach(x=>x.classList.remove('active'));
-        e.target.classList.add('active');
-    }));
-    
-    // Build palette
+// ===== START TEST =====
+function startTest(qs){
+    S.questions=qs;S.idx=0;S.started=true;S.secs=0;
+    S.answers=qs.map(()=>({selected:-1,status:'not-visited',time:0,correct:false}));
+    // Sections
+    const cats=[...new Set(qs.map(q=>q.category||'General'))];
+    const tabs=$('sectionTabs');
+    tabs.innerHTML='<span class="tb-sec-label">SECTIONS</span>';
+    tabs.innerHTML+='<span class="tb-sec-tab active" data-c="all">All</span>';
+    cats.forEach(c=>{tabs.innerHTML+=`<span class="tb-sec-tab" data-c="${c}">${c}</span>`;});
+    tabs.querySelectorAll('.tb-sec-tab').forEach(t=>t.onclick=e=>{tabs.querySelectorAll('.tb-sec-tab').forEach(x=>x.classList.remove('active'));e.target.classList.add('active');});
+    // Palette
     buildPalette();
-    
-    // Show exam
-    showScreen('exam');
-    $('examTitle').textContent=`Practice Test — ${questions.length} Questions`;
-    
-    // Start timer
-    startTimer();
-    
-    // Load first question
-    state.answers[0].status='not-answered';
-    loadQ(0);
+    // Start
+    show('exam');$('testName').textContent=`Practice Test — ${qs.length} Qs`;
+    S.answers[0].status='unanswered';
+    startTimer();loadQ(0);
 }
-
 function buildPalette(){
-    const grid=$('paletteGrid');
-    grid.innerHTML='';
-    state.questions.forEach((_,i)=>{
-        const btn=document.createElement('button');
-        btn.className='palette-btn not-visited';
-        btn.textContent=i+1;
-        btn.addEventListener('click',()=>goTo(i));
-        grid.appendChild(btn);
-    });
+    const g=$('palette');g.innerHTML='';
+    S.questions.forEach((_,i)=>{const b=document.createElement('button');b.className='pal-btn not-visited';b.textContent=i+1;b.onclick=()=>goTo(i);g.appendChild(b);});
 }
-
 function updatePalette(){
-    const btns=$('paletteGrid').querySelectorAll('.palette-btn');
-    btns.forEach((btn,i)=>{
-        btn.className='palette-btn';
-        const a=state.answers[i];
-        if(i===state.currentIndex){btn.classList.add('current');}
-        else if(a.status==='answered')btn.classList.add('answered');
-        else if(a.status==='wrong-answer')btn.classList.add('wrong-answer');
-        else if(a.status==='marked')btn.classList.add('marked');
-        else if(a.status==='not-answered')btn.classList.add('not-answered');
-        else btn.classList.add('not-visited');
+    const btns=$('palette').querySelectorAll('.pal-btn');
+    let cor=0,inc=0,una=0;
+    btns.forEach((b,i)=>{
+        b.className='pal-btn';const a=S.answers[i];
+        if(i===S.idx)b.classList.add('current');
+        else if(a.status==='correct'){b.classList.add('answered');cor++;}
+        else if(a.status==='wrong'){b.classList.add('wrong-a');inc++;}
+        else if(a.status==='marked')b.classList.add('marked');
+        else b.classList.add('not-visited');
+        if(a.status==='correct')cor++;if(a.status==='wrong')inc++;
     });
+    // Fix counts
+    cor=S.answers.filter(a=>a.status==='correct').length;
+    inc=S.answers.filter(a=>a.status==='wrong').length;
+    una=S.answers.filter(a=>a.status==='not-visited'||a.status==='unanswered').length;
+    $('psCorrect').textContent=cor;$('psIncorrect').textContent=inc;$('psUnattempted').textContent=una;
 }
 
 // ===== LOAD QUESTION =====
-function loadQ(index){
-    state.currentIndex=index;
-    const q=state.questions[index];
-    const a=state.answers[index];
-    if(a.status==='not-visited')a.status='not-answered';
-    
-    // Reset per-question timer display
-    state.timerSeconds=a.timeTaken||0;
-    $('timerDisplay').textContent=formatTime(state.timerSeconds);
-    $('timerBox').className='timer-box';
-    
-    $('qNumber').textContent=`Question ${index+1} of ${state.questions.length}`;
+function loadQ(i){
+    S.idx=i;const q=S.questions[i];const a=S.answers[i];
+    if(a.status==='not-visited')a.status='unanswered';
+    S.secs=a.time||0;$('timerVal').textContent=fmt(S.secs);
+    $('qNumLabel').textContent=`Question No.${i+1}`;
     $('qText').textContent=q.question;
-    
-    // Render options
-    const list=$('optionsList');
-    list.innerHTML='';
-    const keys=['A','B','C','D'];
-    const isLocked=(a.status==='answered'||a.status==='wrong-answer');
-    
-    q.options.forEach((opt,i)=>{
-        const div=document.createElement('div');
-        div.className='option-item';
-        if(isLocked)div.classList.add('disabled');
-        if(a.selected===i)div.classList.add('selected');
-        if(isLocked&&i===q.correctAnswer)div.classList.add('correct');
-        if(isLocked&&a.selected===i&&!a.isCorrect)div.classList.add('wrong');
-        
-        div.innerHTML=`<div class="option-radio"></div><span class="option-label">${keys[i]}.</span><span class="option-text">${opt}</span>`;
-        if(!isLocked){
-            div.addEventListener('click',()=>selectOption(i));
-        }
+    $('paletteSectionLabel').textContent='SECTION : '+q.category;
+    // Status badge
+    const badge=$('qStatusBadge');badge.className='tb-q-status';badge.style.display='none';
+    if(a.status==='correct'){badge.className='tb-q-status correct';badge.textContent='Correct';badge.style.display='inline';}
+    if(a.status==='wrong'){badge.className='tb-q-status wrong';badge.textContent='Incorrect';badge.style.display='inline';}
+    $('qTimeYou').textContent=fmt(a.time);
+    // Options
+    const list=$('optionsList');list.innerHTML='';
+    const locked=(a.status==='correct'||a.status==='wrong');
+    q.options.forEach((opt,oi)=>{
+        const div=document.createElement('div');div.className='tb-opt';
+        if(locked)div.classList.add('locked');
+        if(a.selected===oi)div.classList.add('selected');
+        if(locked&&oi===q.correctAnswer)div.classList.add('correct-opt');
+        if(locked&&a.selected===oi&&!a.correct)div.classList.add('wrong-opt');
+        div.innerHTML=`<div class="tb-radio"></div><span class="tb-opt-text">${opt}</span>`;
+        if(!locked)div.onclick=()=>selOpt(oi);
         list.appendChild(div);
     });
-    
     // Feedback
-    const fb=$('feedbackBox');
-    fb.classList.remove('active','correct','wrong');
-    if(isLocked){
-        fb.classList.add('active',a.isCorrect?'correct':'wrong');
-        $('feedbackIcon').textContent=a.isCorrect?'✓':'✗';
-        $('feedbackMsg').textContent=a.isCorrect?'Correct! Well done.':'Incorrect. See the solution below.';
-        $('btnShowSolution').style.display='inline-block';
-    }else{
-        $('btnShowSolution').style.display='none';
-    }
-    
+    const fb=$('tbFeedback');fb.className='tb-feedback';fb.style.display='none';
+    if(a.status==='correct'){fb.className='tb-feedback show correct';fb.textContent='✓ Correct Answer!';fb.style.display='block';}
+    if(a.status==='wrong'){fb.className='tb-feedback show wrong';fb.textContent='✗ Incorrect Answer';fb.style.display='block';}
     // Solution
-    $('solutionBox').classList.remove('active');
-    $('solutionText').textContent=q.explanation||'';
-    
+    $('solutionToggle').style.display=locked?'flex':'none';
+    $('solutionBox').style.display='none';
+    $('solText').textContent=q.explanation;
     updatePalette();
 }
-
-function selectOption(i){
-    const a=state.answers[state.currentIndex];
-    if(a.status==='answered'||a.status==='wrong-answer')return;
-    a.selected=i;
-    // Re-render options to show selection
-    const items=$('optionsList').querySelectorAll('.option-item');
-    items.forEach((el,idx)=>{el.classList.toggle('selected',idx===i);});
+function selOpt(oi){
+    const a=S.answers[S.idx];if(a.status==='correct'||a.status==='wrong')return;
+    a.selected=oi;
+    const items=$('optionsList').querySelectorAll('.tb-opt');
+    items.forEach((el,j)=>{el.classList.toggle('selected',j===oi);});
 }
+</script>
 
-// ===== SAVE & NEXT =====
+
+<script>
+// ===== NAVIGATION =====
 function saveAndNext(){
-    const a=state.answers[state.currentIndex];
-    const q=state.questions[state.currentIndex];
-    
-    // Save time
-    a.timeTaken=state.timerSeconds;
-    
-    // If an option is selected and not yet graded, grade it
-    if(a.selected>=0 && a.status!=='answered' && a.status!=='wrong-answer'){
-        a.isCorrect=(a.selected===q.correctAnswer);
-        a.status=a.isCorrect?'answered':'wrong-answer';
-        // Show feedback immediately
-        loadQ(state.currentIndex);
-        return; // User sees feedback, clicks next again to proceed
+    const a=S.answers[S.idx];const q=S.questions[S.idx];a.time=S.secs;
+    if(a.selected>=0&&a.status!=='correct'&&a.status!=='wrong'){
+        a.correct=(a.selected===q.correctAnswer);a.status=a.correct?'correct':'wrong';
+        loadQ(S.idx);return;
     }
-    
-    // Move to next
-    if(state.currentIndex<state.questions.length-1){
-        goTo(state.currentIndex+1);
-    }
+    if(S.idx<S.questions.length-1)goTo(S.idx+1);
 }
-
-function goTo(index){
-    // Save current time
-    state.answers[state.currentIndex].timeTaken=state.timerSeconds;
-    state.currentIndex=index;
-    // Reset timer for new question
-    state.timerSeconds=state.answers[index].timeTaken||0;
-    loadQ(index);
-}
-
-// ===== NAVIGATION HANDLERS =====
-$('btnNext').addEventListener('click',saveAndNext);
-$('btnPrev').addEventListener('click',()=>{if(state.currentIndex>0)goTo(state.currentIndex-1);});
-$('btnMark').addEventListener('click',()=>{
-    const a=state.answers[state.currentIndex];
-    if(a.status!=='answered'&&a.status!=='wrong-answer')a.status='marked';
-    updatePalette();
-});
-$('btnClear').addEventListener('click',()=>{
-    const a=state.answers[state.currentIndex];
-    if(a.status!=='answered'&&a.status!=='wrong-answer'){a.selected=-1;a.status='not-answered';loadQ(state.currentIndex);}
-});
-$('btnShowSolution').addEventListener('click',()=>{$('solutionBox').classList.add('active');$('btnShowSolution').style.display='none';});
-$('btnFinish').addEventListener('click',finishExam);
+function goTo(i){S.answers[S.idx].time=S.secs;S.idx=i;S.secs=S.answers[i].time||0;loadQ(i);}
+$('btnNext').onclick=saveAndNext;
+$('btnPrev').onclick=()=>{if(S.idx>0)goTo(S.idx-1);};
+$('btnViewSol').onclick=()=>{$('solutionBox').style.display='block';$('solutionToggle').style.display='none';};
+$('btnSubmit').onclick=finishTest;
+$('btnSummary').onclick=finishTest;
+$('btnBack').onclick=()=>{if(confirm('End test and go back?'))finishTest();};
+$('btnAnalytics').onclick=finishTest;
 
 // ===== TIMER =====
-function startTimer(){
-    stopTimer();
-    state.timerInterval=setInterval(()=>{
-        state.timerSeconds++;
-        $('timerDisplay').textContent=formatTime(state.timerSeconds);
-        if(state.timerSeconds>=60)$('timerBox').className='timer-box danger';
-        else if(state.timerSeconds>=30)$('timerBox').className='timer-box warning';
-        else $('timerBox').className='timer-box';
-    },1000);
-}
-function stopTimer(){if(state.timerInterval){clearInterval(state.timerInterval);state.timerInterval=null;}}
-function formatTime(s){return Math.floor(s/60).toString().padStart(2,'0')+':'+((s%60).toString().padStart(2,'0'));}
+function startTimer(){stopTimer();S.timer=setInterval(()=>{S.secs++;$('timerVal').textContent=fmt(S.secs);
+const tb=$('tbTimer');if(S.secs>=60)tb.style.color='#ff5252';else if(S.secs>=30)tb.style.color='#ffd54f';else tb.style.color='';},1000);}
+function stopTimer(){if(S.timer){clearInterval(S.timer);S.timer=null;}}
+function fmt(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
 
-// ===== KEYBOARD SHORTCUTS =====
-document.addEventListener('keydown',e=>{
-    if(!state.quizStarted||!$('examScreen').classList.contains('active'))return;
+// ===== KEYBOARD =====
+document.onkeydown=e=>{
+    if(!S.started||!$('examScreen').classList.contains('active'))return;
     switch(e.key){
-        case '1':selectOption(0);break;
-        case '2':selectOption(1);break;
-        case '3':selectOption(2);break;
-        case '4':selectOption(3);break;
+        case '1':selOpt(0);break;case '2':selOpt(1);break;case '3':selOpt(2);break;case '4':selOpt(3);break;
         case 'Enter':e.preventDefault();saveAndNext();break;
-        case 'ArrowRight':case 'n':case 'N':if(state.currentIndex<state.questions.length-1)goTo(state.currentIndex+1);break;
-        case 'ArrowLeft':case 'p':case 'P':if(state.currentIndex>0)goTo(state.currentIndex-1);break;
-        case 's':case 'S':
-            const a=state.answers[state.currentIndex];
-            if(a.status!=='answered'&&a.status!=='wrong-answer'){a.status='marked';updatePalette();}
-            break;
+        case 'ArrowRight':case 'n':if(S.idx<S.questions.length-1)goTo(S.idx+1);break;
+        case 'ArrowLeft':case 'p':if(S.idx>0)goTo(S.idx-1);break;
     }
-});
+};
 
-// ===== FINISH EXAM =====
-function finishExam(){
-    stopTimer();
-    state.answers[state.currentIndex].timeTaken=state.timerSeconds;
-    state.quizStarted=false;
-    showScreen('results');
-    renderResults();
+// ===== FINISH =====
+function finishTest(){
+    stopTimer();S.answers[S.idx].time=S.secs;S.started=false;show('results');renderResults();
 }
-
 function renderResults(){
-    const total=state.questions.length;
-    const correct=state.answers.filter(a=>a.isCorrect).length;
-    const wrong=state.answers.filter(a=>a.status==='wrong-answer').length;
-    const skipped=total-correct-wrong;
-    const answered=state.answers.filter(a=>a.status==='answered'||a.status==='wrong-answer');
-    const totalTime=answered.reduce((s,a)=>s+a.timeTaken,0);
-    const avgTime=answered.length?Math.round(totalTime/answered.length):0;
-    const pct=Math.round((correct/total)*100);
-    
-    $('bigScore').textContent=pct+'%';
-    $('rCorrect').textContent=correct;
-    $('rWrong').textContent=wrong;
-    $('rSkipped').textContent=skipped;
-    $('rTime').textContent=avgTime+'s';
-    
-    // Table
-    const tbody=$('resultsBody');
-    tbody.innerHTML='';
-    const keys=['A','B','C','D'];
-    state.questions.forEach((q,i)=>{
-        const a=state.answers[i];
+    const tot=S.questions.length;
+    const cor=S.answers.filter(a=>a.status==='correct').length;
+    const wrn=S.answers.filter(a=>a.status==='wrong').length;
+    const skp=tot-cor-wrn;
+    const ans=S.answers.filter(a=>a.status==='correct'||a.status==='wrong');
+    const ttime=ans.reduce((s,a)=>s+a.time,0);
+    const avg=ans.length?Math.round(ttime/ans.length):0;
+    const pct=Math.round((cor/tot)*100);
+    const acc=ans.length?Math.round((cor/ans.length)*100):0;
+    $('resTestName').textContent='Practice Test';
+    // Summary cards
+    $('resSummaryCards').innerHTML=`
+        <div class="res-s-card"><div class="res-s-icon score">🏆</div><div><div class="res-s-val">${cor*1}<span class="res-s-total"> / ${tot}</span></div><div class="res-s-label">Score</div></div></div>
+        <div class="res-s-card"><div class="res-s-icon attempted">📝</div><div><div class="res-s-val">${cor+wrn}<span class="res-s-total"> / ${tot}</span></div><div class="res-s-label">Attempted</div></div></div>
+        <div class="res-s-card"><div class="res-s-icon accuracy">🎯</div><div><div class="res-s-val">${acc}%</div><div class="res-s-label">Accuracy</div></div></div>
+        <div class="res-s-card"><div class="res-s-icon rank">⏱</div><div><div class="res-s-val">${avg}s</div><div class="res-s-label">Avg Time/Q</div></div></div>
+        <div class="res-s-card"><div class="res-s-icon percentile">📊</div><div><div class="res-s-val">${pct}%</div><div class="res-s-label">Score %</div></div></div>`;
+    // Sectional
+    const cats={};S.questions.forEach((q,i)=>{const c=q.category||'General';if(!cats[c])cats[c]={total:0,correct:0,time:0,attempted:0};cats[c].total++;
+    if(S.answers[i].status==='correct'){cats[c].correct++;cats[c].attempted++;cats[c].time+=S.answers[i].time;}
+    else if(S.answers[i].status==='wrong'){cats[c].attempted++;cats[c].time+=S.answers[i].time;}});
+    let tbody='';for(const[name,d]of Object.entries(cats)){
+        const a=d.attempted?Math.round((d.correct/d.attempted)*100):0;
+        const acl=a>=70?'high':a>=40?'mid':'low';
+        tbody+=`<tr><td><b>${name}</b></td><td><b>${d.correct}</b> / ${d.total}</td><td><b>${d.attempted}</b> / ${d.total}</td><td><span class="accuracy-bar ${acl}">${a}%</span></td><td>${fmt(d.time)}</td></tr>`;
+    }
+    $('resTableBody').innerHTML=tbody;
+    // Detail table
+    const keys=['A','B','C','D'];let dt='';
+    S.questions.forEach((q,i)=>{const a=S.answers[i];
         const yours=a.selected>=0?keys[a.selected]+'. '+q.options[a.selected]:'—';
         const corr=keys[q.correctAnswer]+'. '+q.options[q.correctAnswer];
-        let badge='';
-        if(a.isCorrect)badge='<span class="status-badge correct">✓ Correct</span>';
-        else if(a.status==='wrong-answer')badge='<span class="status-badge wrong">✗ Wrong</span>';
-        else badge='<span class="status-badge skipped">— Skipped</span>';
-        tbody.innerHTML+=`<tr><td>${i+1}</td><td>${q.question.substring(0,60)}${q.question.length>60?'...':''}</td><td>${yours}</td><td>${corr}</td><td>${formatTime(a.timeTaken)}</td><td>${badge}</td></tr>`;
+        let st='';if(a.status==='correct')st='<span class="status-dot c">✓ Correct</span>';
+        else if(a.status==='wrong')st='<span class="status-dot w">✗ Wrong</span>';
+        else st='<span class="status-dot s">— Skipped</span>';
+        dt+=`<tr><td>${i+1}</td><td>${q.question.substring(0,55)}${q.question.length>55?'...':''}</td><td>${yours}</td><td>${corr}</td><td>${fmt(a.time)}</td><td>${st}</td></tr>`;
     });
+    $('resDetailBody').innerHTML=dt;
 }
 
 // ===== RESULTS ACTIONS =====
-$('btnRetry').addEventListener('click',()=>startExam(state.questions));
-$('btnNewQuiz').addEventListener('click',()=>{showScreen('upload');$('uploadProgress').classList.remove('active');});
-$('btnExport').addEventListener('click',()=>{
-    const data={date:new Date().toISOString(),total:state.questions.length,
-        score:{correct:state.answers.filter(a=>a.isCorrect).length,wrong:state.answers.filter(a=>a.status==='wrong-answer').length},
-        details:state.questions.map((q,i)=>({q:q.question,category:q.category,yourAnswer:state.answers[i].selected>=0?q.options[state.answers[i].selected]:'—',correct:q.options[q.correctAnswer],time:state.answers[i].timeTaken+'s',status:state.answers[i].isCorrect?'correct':state.answers[i].status==='wrong-answer'?'wrong':'skipped'}))
-    };
-    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='quiz-results.json';a.click();
-});
+$('btnReattempt').onclick=$('btnRetry2').onclick=()=>startTest(S.questions);
+$('btnNew2').onclick=()=>{show('upload');$('upProgress').classList.remove('show');};
+$('btnSolutions').onclick=()=>{/* scroll to detail */document.querySelector('.res-detail-table').scrollIntoView({behavior:'smooth'});};
+$('btnExport2').onclick=()=>{
+    const d={date:new Date().toISOString(),questions:S.questions.length,
+    score:S.answers.filter(a=>a.correct).length,
+    details:S.questions.map((q,i)=>({q:q.question,category:q.category,your:S.answers[i].selected>=0?q.options[S.answers[i].selected]:'—',correct:q.options[q.correctAnswer],time:S.answers[i].time+'s',status:S.answers[i].status}))};
+    const b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='results.json';a.click();
+};
 </script>
 </body>
 </html>
