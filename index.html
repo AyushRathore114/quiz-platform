@@ -404,6 +404,8 @@ function parseFormat_Options(text) {
             const opts = [match[1].trim(), match[2].trim(), match[3].trim(), match[4].trim()];
             if (match[5]) opts.push(match[5].trim());
             qs.push({ question: qText, options: opts.slice(0, 4), correctAnswer: 0, hasKey: false, explanation: '' });
+        }
+        lastEnd = match.index + match[0].length;
     }
     return qs;
 }
