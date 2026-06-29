@@ -403,9 +403,7 @@ function parseFormat_Options(text) {
         if (qText.length >= 5) {
             const opts = [match[1].trim(), match[2].trim(), match[3].trim(), match[4].trim()];
             if (match[5]) opts.push(match[5].trim());
-            qs.push({ question: qText, options: opts.slice(0, 4), correctAnswer: 0, explanation: '' });
-        }
-        lastEnd = match.index + match[0].length;
+            qs.push({ question: qText, options: opts.slice(0, 4), correctAnswer: 0, hasKey: false, explanation: '' });
     }
     return qs;
 }
@@ -444,7 +442,7 @@ function parseFormat_Fallback(text) {
         if (qLines.length > 0 && optLines.length >= 2) {
             let qText = qLines.join(' ').replace(/^Q\s*\d+\s*[:.)\-]\s*/i, '').replace(/^\d+\s*[.):\-]\s*/, '').trim();
             if (qText.length >= 5) {
-                qs.push({ question: qText, options: optLines.slice(0, 4), correctAnswer: 0, explanation: '' });
+                qs.push({ question: qText, options: optLines.slice(0, 4), correctAnswer: 0, hasKey: false, explanation: '' });
             }
         } else {
             i++;
@@ -493,7 +491,7 @@ function extractQFromBlock(block) {
         else if (v >= '1' && v <= '5') ca = parseInt(v) - 1;
     }
     
-    return { question: qText, options: options.slice(0, 4), correctAnswer: Math.min(ca, options.length - 1), explanation: '' };
+    return { question: qText, options: options.slice(0, 4), correctAnswer: Math.min(ca, options.length - 1), hasKey: ansMatch ? true : false, explanation: '' };
 }
 
 function categorize(qs) {
@@ -517,7 +515,9 @@ function categorize(qs) {
             if (s > sc) { sc = s; best = c; }
         }
         q.category = best;
-        if (!q.explanation) q.explanation = `The correct answer is "${q.options[q.correctAnswer]}".`;
+        if (!q.explanation) q.explanation = q.hasKey 
+            ? `The correct answer is "${q.options[q.correctAnswer]}".`
+            : `This question was extracted from your PDF without an answer key. Work through the problem to verify your answer. The options provided are: ${q.options.join(', ')}.`;
         return q;
     });
 }
@@ -601,14 +601,15 @@ function updatePalette(){
     btns.forEach((b,i)=>{
         b.className='pal-btn';const a=S.answers[i];
         if(i===S.idx)b.classList.add('current');
-        else if(a.status==='correct'){b.classList.add('answered');cor++;}
-        else if(a.status==='wrong'){b.classList.add('wrong-a');inc++;}
+        else if(a.status==='correct'){b.classList.add('answered');}
+        else if(a.status==='wrong'){b.classList.add('wrong-a');}
+        else if(a.status==='answered'){b.classList.add('answered');} // No key - show as answered (green)
         else if(a.status==='marked')b.classList.add('marked');
         else b.classList.add('not-visited');
         if(a.status==='correct')cor++;if(a.status==='wrong')inc++;
     });
     // Fix counts
-    cor=S.answers.filter(a=>a.status==='correct').length;
+    cor=S.answers.filter(a=>a.status==='correct'||a.status==='answered').length;
     inc=S.answers.filter(a=>a.status==='wrong').length;
     una=S.answers.filter(a=>a.status==='not-visited'||a.status==='unanswered').length;
     $('psCorrect').textContent=cor;$('psIncorrect').textContent=inc;$('psUnattempted').textContent=una;
@@ -626,16 +627,18 @@ function loadQ(i){
     const badge=$('qStatusBadge');badge.className='tb-q-status';badge.style.display='none';
     if(a.status==='correct'){badge.className='tb-q-status correct';badge.textContent='Correct';badge.style.display='inline';}
     if(a.status==='wrong'){badge.className='tb-q-status wrong';badge.textContent='Incorrect';badge.style.display='inline';}
+    if(a.status==='answered'&&!q.hasKey){badge.className='tb-q-status';badge.style.display='inline';badge.style.background='#1976d2';badge.style.color='#fff';badge.textContent='Answered';}
     $('qTimeYou').textContent=fmt(a.time);
     // Options
     const list=$('optionsList');list.innerHTML='';
-    const locked=(a.status==='correct'||a.status==='wrong');
+    const locked=(a.status==='correct'||a.status==='wrong'||a.status==='answered');
     q.options.forEach((opt,oi)=>{
         const div=document.createElement('div');div.className='tb-opt';
         if(locked)div.classList.add('locked');
         if(a.selected===oi)div.classList.add('selected');
-        if(locked&&oi===q.correctAnswer)div.classList.add('correct-opt');
-        if(locked&&a.selected===oi&&!a.correct)div.classList.add('wrong-opt');
+        if(locked&&q.hasKey&&oi===q.correctAnswer)div.classList.add('correct-opt');
+        if(locked&&q.hasKey&&a.selected===oi&&!a.correct)div.classList.add('wrong-opt');
+        if(locked&&!q.hasKey&&a.selected===oi)div.classList.add('selected'); // keep blue/selected for no-key
         div.innerHTML=`<div class="tb-radio"></div><span class="tb-opt-text">${opt}</span>`;
         if(!locked)div.onclick=()=>selOpt(oi);
         list.appendChild(div);
@@ -644,6 +647,7 @@ function loadQ(i){
     const fb=$('tbFeedback');fb.className='tb-feedback';fb.style.display='none';
     if(a.status==='correct'){fb.className='tb-feedback show correct';fb.textContent='✓ Correct Answer!';fb.style.display='block';}
     if(a.status==='wrong'){fb.className='tb-feedback show wrong';fb.textContent='✗ Incorrect Answer';fb.style.display='block';}
+    if(a.status==='answered'&&!q.hasKey){fb.className='tb-feedback show';fb.style.display='block';fb.style.background='#e3f2fd';fb.style.color='#1565c0';fb.style.borderLeft='4px solid #1976d2';fb.textContent='✓ Answer recorded. Click View Solution to check.';}
     // Solution
     $('solutionToggle').style.display=locked?'flex':'none';
     $('solutionBox').style.display='none';
@@ -663,8 +667,13 @@ function selOpt(oi){
 // ===== NAVIGATION =====
 function saveAndNext(){
     const a=S.answers[S.idx];const q=S.questions[S.idx];a.time=S.secs;
-    if(a.selected>=0&&a.status!=='correct'&&a.status!=='wrong'){
-        a.correct=(a.selected===q.correctAnswer);a.status=a.correct?'correct':'wrong';
+    if(a.selected>=0&&a.status!=='correct'&&a.status!=='wrong'&&a.status!=='answered'){
+        if(q.hasKey){
+            a.correct=(a.selected===q.correctAnswer);a.status=a.correct?'correct':'wrong';
+        } else {
+            // No answer key - just mark as answered (no right/wrong)
+            a.correct=false;a.status='answered';
+        }
         loadQ(S.idx);return;
     }
     if(S.idx<S.questions.length-1)goTo(S.idx+1);
@@ -701,7 +710,7 @@ function finishTest(){
 }
 function renderResults(){
     const tot=S.questions.length;
-    const cor=S.answers.filter(a=>a.status==='correct').length;
+    const cor=S.answers.filter(a=>a.status==='correct'||a.status==='answered').length;
     const wrn=S.answers.filter(a=>a.status==='wrong').length;
     const skp=tot-cor-wrn;
     const ans=S.answers.filter(a=>a.status==='correct'||a.status==='wrong');
@@ -734,6 +743,7 @@ function renderResults(){
         const corr=keys[q.correctAnswer]+'. '+q.options[q.correctAnswer];
         let st='';if(a.status==='correct')st='<span class="status-dot c">✓ Correct</span>';
         else if(a.status==='wrong')st='<span class="status-dot w">✗ Wrong</span>';
+        else if(a.status==='answered')st='<span class="status-dot c">✓ Attempted</span>';
         else st='<span class="status-dot s">— Skipped</span>';
         dt+=`<tr><td>${i+1}</td><td>${q.question.substring(0,55)}${q.question.length>55?'...':''}</td><td>${yours}</td><td>${corr}</td><td>${fmt(a.time)}</td><td>${st}</td></tr>`;
     });
